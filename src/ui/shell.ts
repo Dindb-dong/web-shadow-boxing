@@ -7,6 +7,8 @@ export function createAppShell(container: HTMLElement): {
   videoOverlay: HTMLCanvasElement;
   aiHpBar: HTMLDivElement;
   aiHpValue: HTMLSpanElement;
+  successfulHitsValue: HTMLSpanElement;
+  guardedCountersValue: HTMLSpanElement;
   trackingValue: HTMLSpanElement;
   stateValue: HTMLSpanElement;
   probabilityValue: HTMLSpanElement;
@@ -21,6 +23,11 @@ export function createAppShell(container: HTMLElement): {
       <div class="scene-host"></div>
       <div class="hud-overlay">
         <div class="hud-panel game-version-badge">v${GAME_VERSION}</div>
+        <div class="hud-panel combat-stats-panel">
+          <p class="eyebrow">Combat Stats</p>
+          <div class="metric-row"><span>Successful Hits</span><strong data-role="successful-hits">0</strong></div>
+          <div class="metric-row"><span>Defended Counters</span><strong data-role="guarded-counters">0</strong></div>
+        </div>
         <div class="hud-panel ai-health-panel">
           <div class="ai-health-header">
             <span class="eyebrow">Opponent Vital</span>
@@ -56,7 +63,7 @@ export function createAppShell(container: HTMLElement): {
             <div class="bar-track"><div class="bar-fill hp-fill" data-role="player-hp"></div></div>
             <label>AI Stamina</label>
             <div class="bar-track"><div class="bar-fill stamina-fill" data-role="ai-stamina"></div></div>
-            <p class="combat-tip">Raise both hands near your face to block the AI counter.</p>
+            <p class="combat-tip">Raise your hands or sway back to defend the AI counter.</p>
           </div>
         </div>
       </div>
@@ -68,6 +75,8 @@ export function createAppShell(container: HTMLElement): {
   const videoOverlay = container.querySelector<HTMLCanvasElement>(".camera-overlay");
   const aiHpBar = container.querySelector<HTMLDivElement>("[data-role='ai-hp']");
   const aiHpValue = container.querySelector<HTMLSpanElement>("[data-role='ai-hp-value']");
+  const successfulHitsValue = container.querySelector<HTMLSpanElement>("[data-role='successful-hits']");
+  const guardedCountersValue = container.querySelector<HTMLSpanElement>("[data-role='guarded-counters']");
   const trackingValue = container.querySelector<HTMLSpanElement>("[data-role='tracking']");
   const stateValue = container.querySelector<HTMLSpanElement>("[data-role='state']");
   const probabilityValue = container.querySelector<HTMLSpanElement>("[data-role='probability']");
@@ -83,6 +92,8 @@ export function createAppShell(container: HTMLElement): {
     !videoOverlay ||
     !aiHpBar ||
     !aiHpValue ||
+    !successfulHitsValue ||
+    !guardedCountersValue ||
     !trackingValue ||
     !stateValue ||
     !probabilityValue ||
@@ -101,6 +112,8 @@ export function createAppShell(container: HTMLElement): {
     videoOverlay,
     aiHpBar,
     aiHpValue,
+    successfulHitsValue,
+    guardedCountersValue,
     trackingValue,
     stateValue,
     probabilityValue,

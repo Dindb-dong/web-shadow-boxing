@@ -92,6 +92,8 @@ export interface CombatSnapshot {
   aiHp: number;
   playerHp: number;
   aiStamina: number;
+  successfulHits: number;
+  guardedCounters: number;
   tracking: boolean;
   modelMode: ModelMode;
   activeThreat: ThreatSnapshot;
@@ -100,6 +102,12 @@ export interface CombatSnapshot {
   counterMove: CounterMove | null;
   statusText: string;
   dodgeType: DodgeType | null;
+}
+
+export interface CounterTrigger {
+  move: CounterMove;
+  result: GuardResult;
+  target: Vec3;
 }
 
 export interface HudSnapshot extends CombatSnapshot {

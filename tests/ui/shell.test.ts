@@ -1,4 +1,5 @@
 import { createAppShell } from "../../src/ui/shell";
+import { GAME_VERSION } from "../../src/version";
 
 describe("createAppShell", () => {
   it("creates the main scene host and HUD nodes", () => {
@@ -14,7 +15,11 @@ describe("createAppShell", () => {
     expect(shell.videoOverlay.tagName).toBe("CANVAS");
     expect(shell.aiHpBar.tagName).toBe("DIV");
     expect(shell.aiHpValue.textContent).toContain("100");
-    expect(root?.textContent).toContain("v1.0.1");
+    expect(shell.successfulHitsValue.textContent).toBe("0");
+    expect(shell.guardedCountersValue.textContent).toBe("0");
+    expect(root?.textContent).toContain(`v${GAME_VERSION}`);
+    expect(root?.textContent).toContain("Successful Hits");
+    expect(root?.textContent).toContain("Defended Counters");
     expect(shell.statusValue.textContent).toContain("Camera");
   });
 });

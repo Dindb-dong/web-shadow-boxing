@@ -7,6 +7,8 @@ export class HudController {
     private readonly refs: {
       aiHpBar: HTMLDivElement;
       aiHpValue: HTMLSpanElement;
+      successfulHitsValue: HTMLSpanElement;
+      guardedCountersValue: HTMLSpanElement;
       trackingValue: HTMLSpanElement;
       stateValue: HTMLSpanElement;
       probabilityValue: HTMLSpanElement;
@@ -22,6 +24,8 @@ export class HudController {
   update(snapshot: HudSnapshot): void {
     this.refs.aiHpBar.style.width = `${clamp(snapshot.aiHp, 0, 100)}%`;
     this.refs.aiHpValue.textContent = `${Math.round(clamp(snapshot.aiHp, 0, 100))}%`;
+    this.refs.successfulHitsValue.textContent = `${snapshot.successfulHits}`;
+    this.refs.guardedCountersValue.textContent = `${snapshot.guardedCounters}`;
     this.refs.trackingValue.textContent = snapshot.trackingLabel;
     this.refs.stateValue.textContent = snapshot.stateLabel;
     this.refs.probabilityValue.textContent = snapshot.attackingProbLabel;
