@@ -10,7 +10,7 @@ const WORLD_Z_OFFSET = -0.8;
 /** Moves denormalized user-body coordinates into the stylized Three.js combat space. */
 export function mapBodyPointToWorld(point: Vec3): Vec3 {
   return {
-    x: point.x * WORLD_X_SCALE,
+    x: -point.x * WORLD_X_SCALE,
     y: point.y * WORLD_Y_SCALE + WORLD_Y_OFFSET,
     z: -point.z * WORLD_Z_SCALE + WORLD_Z_OFFSET
   };

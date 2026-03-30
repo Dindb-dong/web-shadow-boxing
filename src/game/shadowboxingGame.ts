@@ -11,6 +11,9 @@ import { HudController } from "../ui/hud";
 import { PoseOverlayRenderer } from "../ui/poseOverlay";
 import { createAppShell } from "../ui/shell";
 
+const THREAT_TRAJECTORY_MAX_PER_SECOND = 4;
+const THREAT_TRAJECTORY_MIN_INTERVAL_MS = 1000 / THREAT_TRAJECTORY_MAX_PER_SECOND;
+
 /** Orchestrates webcam tracking, model inference, combat state, and rendering. */
 export class ShadowboxingGame {
   private readonly shell;
@@ -24,10 +27,13 @@ export class ShadowboxingGame {
   private poseLoopTimer: number | null = null;
   private renderFrameId: number | null = null;
   private inferenceBusy = false;
+  private lastThreatTrajectoryEmitAt: number | null = null;
   private latestHudSnapshot: HudSnapshot = {
     aiHp: 100,
     playerHp: 100,
     aiStamina: 100,
+    successfulHits: 0,
+    guardedCounters: 0,
     tracking: false,
     modelMode: "mock",
     activeThreat: {
@@ -114,11 +120,11 @@ export class ShadowboxingGame {
 
     const now = performance.now();
     const sampled = this.poseTracker.sample(now);
-    this.poseOverlay.draw(
-      this.poseTracker.getLastOverlayPoints(),
-      this.shell.videoPreview.videoWidth,
-      this.shell.videoPreview.videoHeight
-    );
+    const overlayPoints = this.poseTracker.getLastOverlayPoints();
+    const leftWristVisibility = overlayPoints[15]?.visibility ?? 0;
+    const rightWristVisibility = overlayPoints[16]?.visibility ?? 0;
+    const wristsVisible = leftWristVisibility >= 0.5 || rightWristVisibility >= 0.5;
+    this.poseOverlay.draw(overlayPoints, this.shell.videoPreview.videoWidth, this.shell.videoPreview.videoHeight);
     const bufferSnapshot = this.poseBuffer.push(sampled);
 
     if (!bufferSnapshot.ready || !bufferSnapshot.basis) {
@@ -138,7 +144,20 @@ export class ShadowboxingGame {
 
     try {
       const rawPrediction = await this.predictor.predict(bufferSnapshot.features);
-      const adapted = adaptModelOutput(rawPrediction);
+      const adaptedPrediction = adaptModelOutput(rawPrediction);
+      const adapted =
+        adaptedPrediction && !wristsVisible
+          ? {
+              ...adaptedPrediction,
+              state_idx: 0,
+              state_name: "idle" as const,
+              attacking_prob: 0,
+              raw:
+                typeof adaptedPrediction.raw === "object" && adaptedPrediction.raw !== null
+                  ? { ...(adaptedPrediction.raw as Record<string, unknown>), suppressedBy: "wrist-visibility" }
+                  : { suppressedBy: "wrist-visibility" }
+            }
+          : adaptedPrediction;
       const worldTraj = adapted ? trajectoryToWorld(adapted.traj, bufferSnapshot.basis) : null;
       const combatUpdate = this.combat.update({
         now,
@@ -149,14 +168,22 @@ export class ShadowboxingGame {
         userPose: bufferSnapshot.currentPose
       });
 
-      if (worldTraj) {
+      const canEmitThreatTrajectory =
+        this.lastThreatTrajectoryEmitAt === null || now - this.lastThreatTrajectoryEmitAt >= THREAT_TRAJECTORY_MIN_INTERVAL_MS;
+      if (worldTraj && adapted && adapted.attacking_prob >= 0.68 && canEmitThreatTrajectory) {
         this.scene.setThreatTrajectory(worldTraj, now);
+        this.lastThreatTrajectoryEmitAt = now;
       }
       if (combatUpdate.triggerDodge) {
         this.scene.triggerDodge(combatUpdate.triggerDodge, now);
       }
       if (combatUpdate.triggerCounter) {
-        this.scene.triggerCounter(combatUpdate.triggerCounter.move, combatUpdate.triggerCounter.result, now);
+        this.scene.triggerCounter(
+          combatUpdate.triggerCounter.move,
+          combatUpdate.triggerCounter.result,
+          now,
+          combatUpdate.triggerCounter.target
+        );
       }
 
       this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot);

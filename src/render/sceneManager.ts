@@ -1,9 +1,12 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DODGE_DURATION_MS, TRAJECTORY_DISPLAY_MS } from "../game/constants";
-import type { CounterMove, DodgeType, GuardResult, WristPairTrajectory } from "../types/game";
+import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory } from "../types/game";
 
 const COUNTER_ANIMATION_MS = 460;
+const THREAT_SEGMENT_POOL_SIZE = 100;
+const THREAT_SEGMENT_RADIUS = 0.045;
+const THREAT_SEGMENT_BASE_OPACITY = 0.72;
 const LEFT_GLOVE_HOME = new THREE.Vector3(-0.22, 1.42, -1.36);
 const RIGHT_GLOVE_HOME = new THREE.Vector3(0.26, 1.44, -1.34);
 
@@ -21,26 +24,21 @@ interface PunchPose {
   torsoDriveY: number;
 }
 
-function createCylinderBetween(start: THREE.Vector3, end: THREE.Vector3): THREE.Mesh {
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = Math.max(direction.length(), 0.001);
-  const geometry = new THREE.CylinderGeometry(0.045, 0.045, length, 12, 1, false);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xff4f4f,
-    transparent: true,
-    opacity: 0.48,
-    emissive: 0xaa2222,
-    emissiveIntensity: 0.8
-  });
-  const cylinder = new THREE.Mesh(geometry, material);
-  cylinder.position.copy(start).add(end).multiplyScalar(0.5);
-  cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
-  return cylinder;
+interface ThreatSegmentSlot {
+  mesh: THREE.Mesh;
+  material: THREE.MeshStandardMaterial;
+  active: boolean;
+  expiresAt: number;
 }
 
 /** Smoothly accelerates and decelerates lightweight combat motions. */
 function easeInOutSine(value: number): number {
   return -(Math.cos(Math.PI * value) - 1) / 2;
+}
+
+/** Converts a dodge type to a signed lateral direction. */
+function resolveDodgeSide(type: DodgeType): -1 | 1 {
+  return type.startsWith("left") ? -1 : 1;
 }
 
 /** Returns the active punch pose for the requested counter animation frame. */
@@ -114,13 +112,21 @@ export class SceneManager {
     new THREE.MeshStandardMaterial({ color: 0xd62839, roughness: 0.38, metalness: 0.05 })
   );
   private readonly threatGroup = new THREE.Group();
+  private readonly threatSegmentGeometry = new THREE.CylinderGeometry(
+    THREAT_SEGMENT_RADIUS,
+    THREAT_SEGMENT_RADIUS,
+    1,
+    12,
+    1,
+    false
+  );
+  private readonly threatSegments: ThreatSegmentSlot[] = [];
   private readonly shadowPlane = new THREE.Mesh(
     new THREE.CircleGeometry(0.78, 32),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22 })
   );
   private dodgeState: { type: DodgeType; startedAt: number } | null = null;
-  private counterState: { startedAt: number; result: GuardResult; move: CounterMove } | null = null;
-  private threatExpiresAt = 0;
+  private counterState: { startedAt: number; result: GuardResult; move: CounterMove; target: Vec3 } | null = null;
 
   constructor(private readonly host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -228,9 +234,12 @@ export class SceneManager {
     this.shadowPlane.position.set(0, 0.02, -1.98);
     this.leftGlove.position.set(-0.22, 1.42, -1.36);
     this.rightGlove.position.set(0.26, 1.44, -1.34);
+    this.leftGlove.visible = false;
+    this.rightGlove.visible = false;
     this.avatarVisualGroup.add(this.fallbackAvatar);
     this.avatarGroup.add(this.avatarVisualGroup, this.leftGlove, this.rightGlove, this.shadowPlane);
     this.scene.add(this.avatarGroup, this.threatGroup);
+    this.bootstrapThreatPool();
   }
 
   /** Updates renderer size to match the host. */
@@ -244,23 +253,14 @@ export class SceneManager {
 
   /** Rebuilds the translucent cylinder threat overlay for the latest prediction. */
   setThreatTrajectory(traj: WristPairTrajectory | null, now: number): void {
-    this.threatGroup.clear();
-    this.threatExpiresAt = now + TRAJECTORY_DISPLAY_MS;
-
     if (!traj) {
       return;
     }
 
     for (const wristSteps of traj) {
-      for (let index = 0; index < wristSteps.length - 1; index += 1) {
-        const start = wristSteps[index];
-        const end = wristSteps[index + 1];
-        this.threatGroup.add(
-          createCylinderBetween(
-            new THREE.Vector3(start.x, start.y, start.z),
-            new THREE.Vector3(end.x, end.y, end.z)
-          )
-        );
+      const smoothedPath = this.buildSmoothedPath(wristSteps);
+      for (let index = 0; index < smoothedPath.length - 1; index += 1) {
+        this.activateThreatSegment(smoothedPath[index], smoothedPath[index + 1], now + TRAJECTORY_DISPLAY_MS);
       }
     }
   }
@@ -271,8 +271,10 @@ export class SceneManager {
   }
 
   /** Starts a counter animation colored by the guard result. */
-  triggerCounter(move: CounterMove, result: GuardResult, now: number): void {
-    this.counterState = { move, result, startedAt: now };
+  triggerCounter(move: CounterMove, result: GuardResult, now: number, target: Vec3): void {
+    this.leftGlove.visible = true;
+    this.rightGlove.visible = true;
+    this.counterState = { move, result, target, startedAt: now };
   }
 
   /** Advances scene animation and renders one frame. */
@@ -284,17 +286,32 @@ export class SceneManager {
 
   /** Releases WebGL resources. */
   dispose(): void {
+    for (const slot of this.threatSegments) {
+      slot.material.dispose();
+    }
+    this.threatSegmentGeometry.dispose();
     this.renderer.dispose();
   }
 
   private updateThreatOpacity(now: number): void {
-    const remaining = Math.max(this.threatExpiresAt - now, 0) / TRAJECTORY_DISPLAY_MS;
-    this.threatGroup.visible = remaining > 0;
-    this.threatGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        child.material.opacity = 0.48 * remaining;
+    let activeCount = 0;
+    for (const slot of this.threatSegments) {
+      if (!slot.active) {
+        continue;
       }
-    });
+
+      const remaining = Math.max(slot.expiresAt - now, 0) / TRAJECTORY_DISPLAY_MS;
+      if (remaining <= 0) {
+        slot.active = false;
+        slot.mesh.visible = false;
+        continue;
+      }
+
+      activeCount += 1;
+      slot.material.opacity = THREAT_SEGMENT_BASE_OPACITY * remaining;
+    }
+
+    this.threatGroup.visible = activeCount > 0;
   }
 
   private updateAvatarAnimation(now: number): void {
@@ -308,6 +325,9 @@ export class SceneManager {
     if (this.dodgeState) {
       const progress = Math.min((now - this.dodgeState.startedAt) / DODGE_DURATION_MS, 1);
       const arc = Math.sin(progress * Math.PI);
+      const dodgeSide = resolveDodgeSide(this.dodgeState.type);
+      const shoulderLeadYaw = -dodgeSide * 0.24 * arc;
+      const shoulderLeadRoll = -dodgeSide * 0.08 * arc;
 
       if (this.dodgeState.type === "left_weave") {
         this.avatarGroup.position.x += -0.36 * arc;
@@ -328,6 +348,9 @@ export class SceneManager {
         this.avatarGroup.position.y += -0.34 * arc;
         this.avatarGroup.rotation.x += 0.08 * arc;
       }
+      this.avatarVisualGroup.position.x += dodgeSide * 0.06 * arc;
+      this.avatarVisualGroup.rotation.y += shoulderLeadYaw;
+      this.avatarVisualGroup.rotation.z += shoulderLeadRoll;
 
       if (progress >= 1) {
         this.dodgeState = null;
@@ -344,6 +367,11 @@ export class SceneManager {
       const supportGlove = this.counterState.move.startsWith("left") ? this.rightGlove : this.leftGlove;
       const isGuarded = this.counterState.result === "guarded";
       const punchPose = resolvePunchPose(this.counterState.move, progress);
+      this.avatarGroup.updateMatrixWorld(true);
+      const targetLocal = this.avatarGroup.worldToLocal(
+        new THREE.Vector3(this.counterState.target.x, this.counterState.target.y, this.counterState.target.z)
+      );
+      const targetBlend = progress < 0.2 ? 0 : Math.min((progress - 0.2) / 0.45, 1) * 0.72;
       (activeGlove.material as THREE.MeshStandardMaterial).color.set(isGuarded ? "#80ed99" : "#ff5a5f");
       activeGlove.scale.setScalar(isGuarded ? 1.06 : 1.12);
       supportGlove.scale.setScalar(0.98);
@@ -357,6 +385,9 @@ export class SceneManager {
       activeGlove.position.x += punchPose.leadX;
       activeGlove.position.y += punchPose.leadY;
       activeGlove.position.z += punchPose.leadZ;
+      activeGlove.position.x = THREE.MathUtils.lerp(activeGlove.position.x, targetLocal.x, targetBlend);
+      activeGlove.position.y = THREE.MathUtils.lerp(activeGlove.position.y, targetLocal.y, targetBlend);
+      activeGlove.position.z = THREE.MathUtils.lerp(activeGlove.position.z, targetLocal.z, targetBlend);
       supportGlove.position.x += punchPose.rearX;
       supportGlove.position.y += punchPose.rearY;
       supportGlove.position.z += punchPose.rearZ;
@@ -364,10 +395,81 @@ export class SceneManager {
       if (progress >= 1) {
         (this.leftGlove.material as THREE.MeshStandardMaterial).color.set("#d62839");
         (this.rightGlove.material as THREE.MeshStandardMaterial).color.set("#d62839");
+        this.leftGlove.visible = false;
+        this.rightGlove.visible = false;
         this.counterState = null;
       }
     } else {
+      this.leftGlove.visible = false;
+      this.rightGlove.visible = false;
       this.shadowPlane.scale.set(1, 1, 1);
     }
+  }
+
+  /** Pre-allocates threat meshes so trajectory updates can reuse existing GPU resources. */
+  private bootstrapThreatPool(): void {
+    for (let index = 0; index < THREAT_SEGMENT_POOL_SIZE; index += 1) {
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xff4f4f,
+        transparent: true,
+        opacity: THREAT_SEGMENT_BASE_OPACITY,
+        emissive: 0xaa2222,
+        emissiveIntensity: 0.8
+      });
+      const mesh = new THREE.Mesh(this.threatSegmentGeometry, material);
+      mesh.visible = false;
+      this.threatGroup.add(mesh);
+      this.threatSegments.push({
+        mesh,
+        material,
+        active: false,
+        expiresAt: 0
+      });
+    }
+  }
+
+  /** Activates one pooled segment and assigns start/end transform plus lifetime. */
+  private activateThreatSegment(start: THREE.Vector3, end: THREE.Vector3, expiresAt: number): void {
+    const direction = new THREE.Vector3().subVectors(end, start);
+    const length = direction.length();
+    if (length <= 1e-4) {
+      return;
+    }
+
+    const slot = this.findReusableThreatSlot();
+    slot.active = true;
+    slot.expiresAt = expiresAt;
+    slot.material.opacity = THREAT_SEGMENT_BASE_OPACITY;
+    slot.mesh.visible = true;
+    slot.mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    slot.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    slot.mesh.scale.set(1, length, 1);
+  }
+
+  /** Returns an inactive slot when available, otherwise recycles the oldest active one. */
+  private findReusableThreatSlot(): ThreatSegmentSlot {
+    const inactive = this.threatSegments.find((slot) => !slot.active);
+    if (inactive) {
+      return inactive;
+    }
+
+    let oldest = this.threatSegments[0];
+    for (const slot of this.threatSegments) {
+      if (slot.expiresAt < oldest.expiresAt) {
+        oldest = slot;
+      }
+    }
+    return oldest;
+  }
+
+  /** Converts raw predicted wrist points into a smoother Catmull-Rom path. */
+  private buildSmoothedPath(wristSteps: Vec3[]): THREE.Vector3[] {
+    const controls = wristSteps.map((point) => new THREE.Vector3(point.x, point.y, point.z));
+    if (controls.length < 3) {
+      return controls;
+    }
+
+    const curve = new THREE.CatmullRomCurve3(controls, false, "centripetal", 0.35);
+    return curve.getPoints((controls.length - 1) * 2);
   }
 }

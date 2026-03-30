@@ -43,5 +43,5 @@ export function adaptModelOutput(candidate: unknown): ModelOutput | null {
 
 /** Returns whether the current model output should be treated as an active threat. */
 export function isThreateningOutput(output: ModelOutput, threshold: number): boolean {
-  return output.state_name === "attacking" || output.attacking_prob >= threshold;
+  return output.attacking_prob >= threshold;
 }

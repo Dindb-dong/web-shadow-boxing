@@ -30,4 +30,19 @@ describe("modelAdapter", () => {
 
     expect(adapted).toBeNull();
   });
+
+  it("does not treat extremely low-probability attacking labels as active threats", () => {
+    const adapted = adaptModelOutput({
+      state_idx: 1,
+      state_name: "attacking",
+      attacking_prob: 0.12,
+      traj: [
+        Array.from({ length: 6 }, (_, index) => ({ x: index * 0.01, y: index * 0.02, z: -index * 0.03 })),
+        Array.from({ length: 6 }, (_, index) => ({ x: -index * 0.01, y: index * 0.02, z: -index * 0.03 }))
+      ]
+    });
+
+    expect(adapted).not.toBeNull();
+    expect(isThreateningOutput(adapted!, 0.58)).toBe(false);
+  });
 });
