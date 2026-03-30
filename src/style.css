@@ -205,7 +205,6 @@ label,
   background:
     radial-gradient(circle at top, rgba(91, 192, 190, 0.08), transparent 55%),
     #02070b;
-  transform: scaleX(-1);
 }
 
 .camera-preview,
@@ -219,10 +218,12 @@ label,
 .camera-preview {
   border-radius: 0.9rem;
   object-fit: cover;
+  transform: scaleX(-1);
 }
 
 .camera-overlay {
   pointer-events: none;
+  transform: scaleX(-1);
 }
 
 .combat-tip {

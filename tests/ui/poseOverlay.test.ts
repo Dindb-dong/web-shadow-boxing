@@ -1,4 +1,4 @@
-import { buildPoseOverlayPaths, computeCoverViewport } from "../../src/ui/poseOverlay";
+import { buildPoseOverlayPaths, computeCoverViewport, filterOverlayPoints, projectOverlayPoint } from "../../src/ui/poseOverlay";
 
 describe("buildPoseOverlayPaths", () => {
   it("creates drawable skeleton segments from visible landmarks", () => {
@@ -33,5 +33,29 @@ describe("buildPoseOverlayPaths", () => {
     expect(viewport.drawWidth).toBe(320);
     expect(viewport.drawHeight).toBeCloseTo(240);
     expect(viewport.offsetY).toBeCloseTo(-30);
+  });
+
+  it("projects x coordinates directly before the shared CSS mirror is applied", () => {
+    const projected = projectOverlayPoint(
+      { x: 0.25, y: 0.5, visibility: 1 },
+      { drawWidth: 300, drawHeight: 200, offsetX: 10, offsetY: 20 }
+    );
+
+    expect(projected.x).toBeCloseTo(85);
+    expect(projected.y).toBeCloseTo(120);
+  });
+
+  it("keeps only the upper-body landmarks visible for the overlay", () => {
+    const filtered = filterOverlayPoints(
+      Array.from({ length: 33 }, (_, index) => ({
+        x: index / 33,
+        y: index / 33,
+        visibility: 1
+      }))
+    );
+
+    expect(filtered[1].visibility).toBe(0);
+    expect(filtered[11].visibility).toBe(1);
+    expect(filtered[15].visibility).toBe(1);
   });
 });

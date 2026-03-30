@@ -1,19 +1,13 @@
 import type { PoseOverlayPoint } from "../types/game";
 
 const CONNECTIONS: Array<[number, number]> = [
-  [0, 2],
-  [0, 5],
-  [2, 7],
-  [5, 8],
-  [9, 10],
+  [0, 11],
+  [0, 12],
   [11, 12],
   [11, 13],
   [13, 15],
   [12, 14],
-  [14, 16],
-  [11, 23],
-  [12, 24],
-  [23, 24]
+  [14, 16]
 ];
 
 export interface PoseOverlaySegment {
@@ -28,6 +22,11 @@ export interface PoseOverlayViewport {
   offsetY: number;
 }
 
+export interface ProjectedOverlayPoint {
+  x: number;
+  y: number;
+}
+
 /** Builds drawable line segments from the latest MediaPipe landmark list. */
 export function buildPoseOverlayPaths(points: PoseOverlayPoint[]): PoseOverlaySegment[] {
   return CONNECTIONS.flatMap(([startIndex, endIndex]) => {
@@ -40,6 +39,21 @@ export function buildPoseOverlayPaths(points: PoseOverlayPoint[]): PoseOverlaySe
 
     return [{ start, end }];
   });
+}
+
+/** Keeps the overlay focused on the upper-body landmarks used by the game. */
+export function filterOverlayPoints(points: PoseOverlayPoint[]): PoseOverlayPoint[] {
+  const visibleIndices = new Set([0, 11, 12, 13, 14, 15, 16]);
+
+  return points.map((point, index) =>
+    visibleIndices.has(index)
+      ? point
+      : {
+          x: point.x,
+          y: point.y,
+          visibility: 0
+        }
+  );
 }
 
 /** Computes the visible object-fit cover box used by the mirrored webcam element. */
@@ -82,6 +96,17 @@ export function computeCoverViewport(
   };
 }
 
+/** Projects one normalized landmark into the visible webcam rectangle. */
+export function projectOverlayPoint(
+  point: PoseOverlayPoint,
+  viewport: PoseOverlayViewport
+): ProjectedOverlayPoint {
+  return {
+    x: viewport.offsetX + point.x * viewport.drawWidth,
+    y: viewport.offsetY + point.y * viewport.drawHeight
+  };
+}
+
 /** Draws a MediaPipe-style body wireframe over the mirrored webcam preview. */
 export class PoseOverlayRenderer {
   constructor(private readonly canvas: HTMLCanvasElement) {}
@@ -114,39 +139,31 @@ export class PoseOverlayRenderer {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
 
-    const segments = buildPoseOverlayPaths(points);
+    const filteredPoints = filterOverlayPoints(points);
+    const segments = buildPoseOverlayPaths(filteredPoints);
     const viewport = computeCoverViewport(sourceWidth, sourceHeight, width, height);
     context.lineWidth = 4;
     context.strokeStyle = "rgba(240, 246, 255, 0.92)";
     context.lineCap = "round";
 
     for (const segment of segments) {
+      const start = projectOverlayPoint(segment.start, viewport);
+      const end = projectOverlayPoint(segment.end, viewport);
       context.beginPath();
-      context.moveTo(
-        viewport.offsetX + segment.start.x * viewport.drawWidth,
-        viewport.offsetY + segment.start.y * viewport.drawHeight
-      );
-      context.lineTo(
-        viewport.offsetX + segment.end.x * viewport.drawWidth,
-        viewport.offsetY + segment.end.y * viewport.drawHeight
-      );
+      context.moveTo(start.x, start.y);
+      context.lineTo(end.x, end.y);
       context.stroke();
     }
 
-    for (const point of points) {
+    for (const point of filteredPoints) {
       if (point.visibility < 0.35) {
         continue;
       }
 
-      const isFace = point.y < 0.38;
+      const isFace = point.y < 0.32;
+      const projected = projectOverlayPoint(point, viewport);
       context.beginPath();
-      context.arc(
-        viewport.offsetX + point.x * viewport.drawWidth,
-        viewport.offsetY + point.y * viewport.drawHeight,
-        isFace ? 4 : 5.5,
-        0,
-        Math.PI * 2
-      );
+      context.arc(projected.x, projected.y, isFace ? 4 : 5.5, 0, Math.PI * 2);
       context.fillStyle = isFace ? "#ffb703" : "#4cc9f0";
       context.fill();
       context.strokeStyle = "rgba(0, 0, 0, 0.3)";
