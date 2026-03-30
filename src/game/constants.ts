@@ -1,0 +1,14 @@
+export const SEQUENCE_LENGTH = 12;
+export const FEATURE_DIMENSION = 54;
+export const PREDICTION_HORIZON = 6;
+export const SAMPLE_INTERVAL_MS = 50;
+export const MAX_TRACKING_GAP = 3;
+export const THREAT_PROBABILITY_THRESHOLD = 0.58;
+export const AI_STAMINA_MAX = 100;
+export const AI_STAMINA_DODGE_COST = 18;
+export const AI_STAMINA_RECOVERY_PER_SEC = 10;
+export const PLAYER_HP_MAX = 100;
+export const COUNTER_DELAY_MS = 700;
+export const DODGE_DURATION_MS = 550;
+export const TRAJECTORY_DISPLAY_MS = 1000;
+export const GUARD_DISTANCE_THRESHOLD = 0.18;
