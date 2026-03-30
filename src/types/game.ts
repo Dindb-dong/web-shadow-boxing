@@ -89,6 +89,7 @@ export interface ThreatSnapshot {
 }
 
 export interface CombatSnapshot {
+  aiHp: number;
   playerHp: number;
   aiStamina: number;
   tracking: boolean;

@@ -2,7 +2,24 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DODGE_DURATION_MS, TRAJECTORY_DISPLAY_MS } from "../game/constants";
 import type { CounterMove, DodgeType, GuardResult, WristPairTrajectory } from "../types/game";
-import { lerp } from "../utils/vector";
+
+const COUNTER_ANIMATION_MS = 460;
+const LEFT_GLOVE_HOME = new THREE.Vector3(-0.22, 1.42, -1.36);
+const RIGHT_GLOVE_HOME = new THREE.Vector3(0.26, 1.44, -1.34);
+
+interface PunchPose {
+  leadX: number;
+  leadY: number;
+  leadZ: number;
+  rearX: number;
+  rearY: number;
+  rearZ: number;
+  torsoYaw: number;
+  torsoRoll: number;
+  torsoPitch: number;
+  torsoDriveX: number;
+  torsoDriveY: number;
+}
 
 function createCylinderBetween(start: THREE.Vector3, end: THREE.Vector3): THREE.Mesh {
   const direction = new THREE.Vector3().subVectors(end, start);
@@ -19,6 +36,65 @@ function createCylinderBetween(start: THREE.Vector3, end: THREE.Vector3): THREE.
   cylinder.position.copy(start).add(end).multiplyScalar(0.5);
   cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
   return cylinder;
+}
+
+/** Smoothly accelerates and decelerates lightweight combat motions. */
+function easeInOutSine(value: number): number {
+  return -(Math.cos(Math.PI * value) - 1) / 2;
+}
+
+/** Returns the active punch pose for the requested counter animation frame. */
+function resolvePunchPose(move: CounterMove, progress: number): PunchPose {
+  const side = move.startsWith("left") ? -1 : 1;
+  const windupProgress = progress < 0.28 ? easeInOutSine(progress / 0.28) : progress < 0.5 ? 1 - easeInOutSine((progress - 0.28) / 0.22) : 0;
+  const strikeProgress =
+    progress < 0.22 ? 0 : progress < 0.6 ? easeInOutSine((progress - 0.22) / 0.38) : 1 - easeInOutSine((progress - 0.6) / 0.4);
+
+  if (move.endsWith("straight")) {
+    return {
+      leadX: side * (0.09 * strikeProgress - 0.1 * windupProgress),
+      leadY: 0.02 * strikeProgress + 0.03 * windupProgress,
+      leadZ: -0.92 * strikeProgress + 0.14 * windupProgress,
+      rearX: side * 0.05 * strikeProgress,
+      rearY: 0.04 * windupProgress,
+      rearZ: -0.08 * windupProgress,
+      torsoYaw: -side * (0.26 * strikeProgress - 0.12 * windupProgress),
+      torsoRoll: -side * 0.08 * strikeProgress,
+      torsoPitch: 0.04 * strikeProgress,
+      torsoDriveX: side * 0.04 * strikeProgress,
+      torsoDriveY: 0.02 * strikeProgress
+    };
+  }
+
+  if (move.endsWith("hook")) {
+    return {
+      leadX: -side * (0.34 * strikeProgress) - side * 0.08 * windupProgress,
+      leadY: 0.06 * strikeProgress,
+      leadZ: -0.56 * strikeProgress + 0.1 * windupProgress,
+      rearX: side * 0.06 * windupProgress,
+      rearY: 0.02 * windupProgress,
+      rearZ: -0.06 * windupProgress,
+      torsoYaw: -side * (0.38 * strikeProgress - 0.08 * windupProgress),
+      torsoRoll: -side * 0.18 * strikeProgress,
+      torsoPitch: 0.02 * strikeProgress,
+      torsoDriveX: side * 0.07 * strikeProgress,
+      torsoDriveY: 0.015 * strikeProgress
+    };
+  }
+
+  return {
+    leadX: -side * 0.08 * windupProgress + side * 0.06 * strikeProgress,
+    leadY: 0.32 * strikeProgress - 0.08 * windupProgress,
+    leadZ: -0.66 * strikeProgress + 0.1 * windupProgress,
+    rearX: side * 0.05 * windupProgress,
+    rearY: 0.04 * windupProgress,
+    rearZ: -0.05 * windupProgress,
+    torsoYaw: -side * (0.18 * strikeProgress - 0.08 * windupProgress),
+    torsoRoll: -side * 0.12 * strikeProgress,
+    torsoPitch: -0.06 * windupProgress + 0.07 * strikeProgress,
+    torsoDriveX: side * 0.03 * strikeProgress,
+    torsoDriveY: 0.035 * strikeProgress
+  };
 }
 
 /** Handles the Three.js scene, the avatar mesh, and lightweight combat animations. */
@@ -226,6 +302,7 @@ export class SceneManager {
     const idleDip = Math.sin(now * 0.0038);
     this.avatarGroup.position.set(idleSwing * 0.035, idleDip * 0.018, 0);
     this.avatarGroup.rotation.set(0, idleSwing * 0.08, idleSwing * 0.018);
+    this.avatarVisualGroup.position.set(0, 0, 0);
     this.avatarVisualGroup.rotation.set(idleDip * 0.04, idleSwing * 0.08, idleSwing * 0.02);
 
     if (this.dodgeState) {
@@ -257,33 +334,40 @@ export class SceneManager {
       }
     }
 
-    this.leftGlove.position.set(-0.22, 1.42, -1.36);
-    this.rightGlove.position.set(0.26, 1.44, -1.34);
+    this.leftGlove.position.copy(LEFT_GLOVE_HOME);
+    this.rightGlove.position.copy(RIGHT_GLOVE_HOME);
+    this.leftGlove.scale.setScalar(1);
+    this.rightGlove.scale.setScalar(1);
     if (this.counterState) {
-      const progress = Math.min((now - this.counterState.startedAt) / 420, 1);
-      const punchArc = Math.sin(progress * Math.PI);
-      const activeGlove =
-        this.counterState.move.startsWith("left") ? this.leftGlove : this.rightGlove;
+      const progress = Math.min((now - this.counterState.startedAt) / COUNTER_ANIMATION_MS, 1);
+      const activeGlove = this.counterState.move.startsWith("left") ? this.leftGlove : this.rightGlove;
+      const supportGlove = this.counterState.move.startsWith("left") ? this.rightGlove : this.leftGlove;
       const isGuarded = this.counterState.result === "guarded";
+      const punchPose = resolvePunchPose(this.counterState.move, progress);
       (activeGlove.material as THREE.MeshStandardMaterial).color.set(isGuarded ? "#80ed99" : "#ff5a5f");
+      activeGlove.scale.setScalar(isGuarded ? 1.06 : 1.12);
+      supportGlove.scale.setScalar(0.98);
+      this.avatarVisualGroup.position.x += punchPose.torsoDriveX;
+      this.avatarVisualGroup.position.y += punchPose.torsoDriveY;
+      this.avatarVisualGroup.rotation.x += punchPose.torsoPitch;
+      this.avatarVisualGroup.rotation.y += punchPose.torsoYaw;
+      this.avatarVisualGroup.rotation.z += punchPose.torsoRoll;
+      this.shadowPlane.scale.set(1 + Math.abs(punchPose.torsoDriveX) * 0.6, 1 + punchPose.torsoDriveY * 1.2, 1);
 
-      if (this.counterState.move.endsWith("straight")) {
-        activeGlove.position.z = lerp(activeGlove.position.z, -0.48, punchArc);
-        activeGlove.position.y += 0.02 * punchArc;
-      } else if (this.counterState.move.endsWith("hook")) {
-        activeGlove.position.x += (this.counterState.move.startsWith("left") ? 0.26 : -0.26) * punchArc;
-        activeGlove.position.z = lerp(activeGlove.position.z, -0.72, punchArc);
-        activeGlove.position.y += 0.04 * punchArc;
-      } else {
-        activeGlove.position.y += 0.22 * punchArc;
-        activeGlove.position.z = lerp(activeGlove.position.z, -0.74, punchArc);
-      }
+      activeGlove.position.x += punchPose.leadX;
+      activeGlove.position.y += punchPose.leadY;
+      activeGlove.position.z += punchPose.leadZ;
+      supportGlove.position.x += punchPose.rearX;
+      supportGlove.position.y += punchPose.rearY;
+      supportGlove.position.z += punchPose.rearZ;
 
       if (progress >= 1) {
         (this.leftGlove.material as THREE.MeshStandardMaterial).color.set("#d62839");
         (this.rightGlove.material as THREE.MeshStandardMaterial).color.set("#d62839");
         this.counterState = null;
       }
+    } else {
+      this.shadowPlane.scale.set(1, 1, 1);
     }
   }
 }

@@ -25,6 +25,7 @@ export class ShadowboxingGame {
   private renderFrameId: number | null = null;
   private inferenceBusy = false;
   private latestHudSnapshot: HudSnapshot = {
+    aiHp: 100,
     playerHp: 100,
     aiStamina: 100,
     tracking: false,

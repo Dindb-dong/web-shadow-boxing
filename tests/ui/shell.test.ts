@@ -12,6 +12,8 @@ describe("createAppShell", () => {
     expect(shell.sceneHost.className).toContain("scene-host");
     expect(shell.videoPreview.tagName).toBe("VIDEO");
     expect(shell.videoOverlay.tagName).toBe("CANVAS");
+    expect(shell.aiHpBar.tagName).toBe("DIV");
+    expect(shell.aiHpValue.textContent).toContain("100");
     expect(shell.statusValue.textContent).toContain("Camera");
   });
 });

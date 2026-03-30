@@ -1,4 +1,6 @@
 import {
+  AI_HIT_DAMAGE,
+  AI_HP_MAX,
   AI_STAMINA_DODGE_COST,
   AI_STAMINA_MAX,
   AI_STAMINA_RECOVERY_PER_SEC,
@@ -76,10 +78,12 @@ function isGuarding(pose: ResolvedPoseFrame | null): boolean {
 
 /** Encapsulates dodge, stamina, counter, and guard state transitions. */
 export class CombatSystem {
+  private aiHp = AI_HP_MAX;
   private playerHp = PLAYER_HP_MAX;
   private aiStamina = AI_STAMINA_MAX;
   private lastUpdateTime: number | null = null;
   private threatExpiresAt: number | null = null;
+  private aiHitCooldownUntil: number | null = null;
   private counterDueAt: number | null = null;
   private lastGuardResult: GuardResult = "none";
   private dodgeType: DodgeType | null = null;
@@ -145,6 +149,13 @@ export class CombatSystem {
         this.lastGuardResult = "none";
         this.statusText = `AI ${this.dodgeType.replace("_", " ")} and loads ${this.counterMove.replace("_", " ")}`;
         triggerDodge = this.dodgeType;
+      } else if (this.aiHitCooldownUntil === null || now >= this.aiHitCooldownUntil) {
+        this.aiHp = Math.max(this.aiHp - AI_HIT_DAMAGE, 0);
+        this.aiHitCooldownUntil = now + DODGE_DURATION_MS;
+        this.counterDueAt = null;
+        this.counterMove = null;
+        this.lastGuardResult = "none";
+        this.statusText = this.aiHp > 0 ? "AI got clipped while exhausted" : "AI is down";
       } else {
         this.statusText = "AI is exhausted and cannot dodge";
       }
@@ -189,6 +200,7 @@ export class CombatSystem {
   /** Creates an immutable HUD-friendly snapshot. */
   private createSnapshot(modelMode: ModelMode, tracking: boolean): CombatSnapshot {
     return {
+      aiHp: this.aiHp,
       playerHp: this.playerHp,
       aiStamina: this.aiStamina,
       tracking,

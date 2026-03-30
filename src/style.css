@@ -92,6 +92,28 @@ body {
   padding: 1rem 1.2rem;
 }
 
+.ai-health-panel {
+  position: absolute;
+  top: 1.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(24rem, calc(100% - 3rem));
+  padding: 0.8rem 1rem 0.95rem;
+}
+
+.ai-health-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ai-health-header strong {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.15rem;
+  color: #ffe7a1;
+}
+
 .eyebrow {
   margin: 0 0 0.35rem;
   color: #8ecae6;
@@ -184,6 +206,19 @@ label,
   background: linear-gradient(90deg, #43aa8b, #90be6d);
 }
 
+.ai-health-track {
+  margin: 0.3rem 0 0;
+  height: 1rem;
+  background:
+    linear-gradient(90deg, rgba(255, 92, 92, 0.14), rgba(255, 214, 102, 0.14)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.ai-hp-fill {
+  background: linear-gradient(90deg, #ff5c5c, #ffb703 58%, #ffe066);
+  box-shadow: 0 0 16px rgba(255, 183, 3, 0.28);
+}
+
 .video-label {
   text-transform: uppercase;
   letter-spacing: 0.15em;
@@ -223,7 +258,6 @@ label,
 
 .camera-overlay {
   pointer-events: none;
-  transform: scaleX(-1);
 }
 
 .combat-tip {
@@ -239,5 +273,6 @@ label,
 
   .hero-panel {
     width: 100%;
+    margin-top: 4.8rem;
   }
 }

@@ -3,6 +3,8 @@ export function createAppShell(container: HTMLElement): {
   sceneHost: HTMLDivElement;
   videoPreview: HTMLVideoElement;
   videoOverlay: HTMLCanvasElement;
+  aiHpBar: HTMLDivElement;
+  aiHpValue: HTMLSpanElement;
   trackingValue: HTMLSpanElement;
   stateValue: HTMLSpanElement;
   probabilityValue: HTMLSpanElement;
@@ -16,6 +18,13 @@ export function createAppShell(container: HTMLElement): {
     <div class="game-shell">
       <div class="scene-host"></div>
       <div class="hud-overlay">
+        <div class="hud-panel ai-health-panel">
+          <div class="ai-health-header">
+            <span class="eyebrow">Opponent Vital</span>
+            <strong data-role="ai-hp-value">100%</strong>
+          </div>
+          <div class="bar-track ai-health-track"><div class="bar-fill ai-hp-fill" data-role="ai-hp"></div></div>
+        </div>
         <div class="hud-panel hero-panel">
           <p class="eyebrow">Shadowboxing Partner</p>
           <h1>Live Sparring Arena</h1>
@@ -54,6 +63,8 @@ export function createAppShell(container: HTMLElement): {
   const sceneHost = container.querySelector<HTMLDivElement>(".scene-host");
   const videoPreview = container.querySelector<HTMLVideoElement>(".camera-preview");
   const videoOverlay = container.querySelector<HTMLCanvasElement>(".camera-overlay");
+  const aiHpBar = container.querySelector<HTMLDivElement>("[data-role='ai-hp']");
+  const aiHpValue = container.querySelector<HTMLSpanElement>("[data-role='ai-hp-value']");
   const trackingValue = container.querySelector<HTMLSpanElement>("[data-role='tracking']");
   const stateValue = container.querySelector<HTMLSpanElement>("[data-role='state']");
   const probabilityValue = container.querySelector<HTMLSpanElement>("[data-role='probability']");
@@ -67,6 +78,8 @@ export function createAppShell(container: HTMLElement): {
     !sceneHost ||
     !videoPreview ||
     !videoOverlay ||
+    !aiHpBar ||
+    !aiHpValue ||
     !trackingValue ||
     !stateValue ||
     !probabilityValue ||
@@ -83,6 +96,8 @@ export function createAppShell(container: HTMLElement): {
     sceneHost,
     videoPreview,
     videoOverlay,
+    aiHpBar,
+    aiHpValue,
     trackingValue,
     stateValue,
     probabilityValue,

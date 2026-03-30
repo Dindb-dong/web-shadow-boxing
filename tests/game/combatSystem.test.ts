@@ -75,6 +75,7 @@ describe("combatSystem", () => {
     });
 
     expect(first.triggerDodge).not.toBeNull();
+    expect(first.snapshot.aiHp).toBe(100);
     expect(second.triggerCounter?.result).toBe("guarded");
     expect(second.triggerCounter?.move).toBeDefined();
     expect(second.snapshot.lastGuardResult).toBe("guarded");
@@ -128,7 +129,8 @@ describe("combatSystem", () => {
 
     expect(exhaustedResult).not.toBeNull();
     expect(exhaustedResult?.triggerDodge).toBeNull();
-    expect(exhaustedResult?.snapshot.statusText).toContain("exhausted");
+    expect(exhaustedResult?.snapshot.statusText).toContain("clipped");
+    expect(exhaustedResult?.snapshot.aiHp).toBeLessThan(100);
   });
 
   it("maps dodge direction to structured counter families", () => {
