@@ -42,7 +42,6 @@ export class SceneManager {
     new THREE.CircleGeometry(0.78, 32),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22 })
   );
-  private readonly waistClipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.05);
   private dodgeState: { type: DodgeType; startedAt: number } | null = null;
   private counterState: { startedAt: number; result: GuardResult; move: CounterMove } | null = null;
   private threatExpiresAt = 0;
@@ -52,7 +51,6 @@ export class SceneManager {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.localClippingEnabled = true;
     this.host.appendChild(this.renderer.domElement);
     this.bootstrapScene();
     this.resize();
@@ -67,24 +65,15 @@ export class SceneManager {
       const bounds = new THREE.Box3().setFromObject(fighter);
       const size = bounds.getSize(new THREE.Vector3());
       const center = bounds.getCenter(new THREE.Vector3());
-      const targetHeight = 2.9;
+      const targetHeight = 3.4;
       const scale = size.y > 0 ? targetHeight / size.y : 1.4;
       fighter.scale.setScalar(scale);
-      fighter.position.set(-center.x * scale, -bounds.min.y * scale, -2.05 - center.z * scale * 0.2);
+      fighter.position.set(-center.x * scale, -bounds.min.y * scale - 1.55, -2.08 - center.z * scale * 0.2);
       fighter.rotation.y = 0;
-      const scaledBounds = new THREE.Box3().setFromObject(fighter);
-      const waistY = scaledBounds.min.y + scaledBounds.getSize(new THREE.Vector3()).y * 0.44;
-      this.waistClipPlane.constant = -waistY;
       fighter.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           child.castShadow = true;
           child.receiveShadow = true;
-          const materials = Array.isArray(child.material) ? child.material : [child.material];
-          child.material = materials.map((material) => {
-            const cloned = material.clone();
-            cloned.clippingPlanes = [this.waistClipPlane];
-            return cloned;
-          });
         }
       });
       this.fallbackAvatar.visible = false;
@@ -100,8 +89,8 @@ export class SceneManager {
     this.scene.background = new THREE.Color("#050d14");
     this.scene.fog = new THREE.Fog("#050d14", 4.2, 11.5);
 
-    this.camera.position.set(0, 1.66, 1.56);
-    this.camera.lookAt(0, 1.42, -2.18);
+    this.camera.position.set(0, 1.72, 1.28);
+    this.camera.lookAt(0, 1.46, -2.12);
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.75);
     const keyLight = new THREE.DirectionalLight(0xb2dbff, 1.35);
@@ -129,7 +118,7 @@ export class SceneManager {
     this.scene.add(ringPlatform);
 
     const ropeMaterial = new THREE.MeshStandardMaterial({ color: 0xca2c44, roughness: 0.45, metalness: 0.15 });
-    for (const height of [0.88, 1.08, 1.28]) {
+    for (const height of [0.86, 1.06, 1.26]) {
       const rope = new THREE.Mesh(new THREE.TorusGeometry(2.08, 0.02, 8, 64), ropeMaterial);
       rope.rotation.x = Math.PI / 2;
       rope.position.set(0, height, -2.04);
@@ -159,9 +148,6 @@ export class SceneManager {
 
     this.fallbackAvatar.add(body, head, leftShoulder, rightShoulder);
     this.avatarGroup.add(this.fallbackAvatar);
-    [body, head, leftShoulder, rightShoulder].forEach((mesh) => {
-      (mesh.material as THREE.MeshStandardMaterial).clippingPlanes = [this.waistClipPlane];
-    });
     this.shadowPlane.rotation.x = -Math.PI / 2;
     this.shadowPlane.position.set(0, 0.02, -1.98);
     this.leftGlove.position.set(-0.22, 1.42, -1.36);
