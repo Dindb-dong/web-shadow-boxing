@@ -14,6 +14,7 @@ describe("createAppShell", () => {
     expect(shell.videoOverlay.tagName).toBe("CANVAS");
     expect(shell.aiHpBar.tagName).toBe("DIV");
     expect(shell.aiHpValue.textContent).toContain("100");
+    expect(root?.textContent).toContain("v1.0.1");
     expect(shell.statusValue.textContent).toContain("Camera");
   });
 });

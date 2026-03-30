@@ -6,10 +6,16 @@ const CONNECTIONS: Array<[number, number]> = [
   [11, 12],
   [11, 13],
   [13, 15],
+  [15, 17],
+  [15, 19],
+  [15, 21],
   [12, 14],
-  [14, 16]
+  [14, 16],
+  [16, 18],
+  [16, 20],
+  [16, 22]
 ];
-const DEBUG_LANDMARK_ORDER = [0, 15, 16, 11, 12, 13, 14];
+const DEBUG_LANDMARK_ORDER = [0, 15, 16, 19, 20, 11, 12, 13, 14];
 const LANDMARK_LABELS: Record<number, string> = {
   0: "nose",
   11: "leftShoulder",
@@ -17,7 +23,13 @@ const LANDMARK_LABELS: Record<number, string> = {
   13: "leftElbow",
   14: "rightElbow",
   15: "leftWrist",
-  16: "rightWrist"
+  16: "rightWrist",
+  17: "leftPinky",
+  18: "rightPinky",
+  19: "leftIndex",
+  20: "rightIndex",
+  21: "leftThumb",
+  22: "rightThumb"
 };
 
 export interface PoseOverlaySegment {
@@ -52,7 +64,7 @@ export interface PoseOverlayDebugSnapshot {
   canvasHeight: number;
   viewport: PoseOverlayViewport;
   probe: PoseOverlayDebugProbe | null;
-  overlayMirrorMode: "coordinate";
+  overlayMirrorMode: "full-mirror";
 }
 
 /** Builds drawable line segments from the latest MediaPipe landmark list. */
@@ -71,7 +83,7 @@ export function buildPoseOverlayPaths(points: PoseOverlayPoint[]): PoseOverlaySe
 
 /** Keeps the overlay focused on the upper-body landmarks used by the game. */
 export function filterOverlayPoints(points: PoseOverlayPoint[]): PoseOverlayPoint[] {
-  const visibleIndices = new Set([0, 11, 12, 13, 14, 15, 16]);
+  const visibleIndices = new Set([0, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
 
   return points.map((point, index) =>
     visibleIndices.has(index)
@@ -180,7 +192,7 @@ export function buildPoseOverlayDebugSnapshot(
     canvasHeight,
     viewport,
     probe,
-    overlayMirrorMode: "coordinate"
+    overlayMirrorMode: "full-mirror"
   };
 }
 
@@ -340,16 +352,17 @@ export class PoseOverlayRenderer {
       context.stroke();
     }
 
-    for (const point of filteredPoints) {
+    for (const [index, point] of filteredPoints.entries()) {
       if (point.visibility < 0.35) {
         continue;
       }
 
       const isFace = point.y < 0.32;
+      const isHand = index >= 17 && index <= 22;
       const projected = mirrorOverlayPoint(point, viewport);
       context.beginPath();
-      context.arc(projected.x, projected.y, isFace ? 4 : 5.5, 0, Math.PI * 2);
-      context.fillStyle = isFace ? "#ffb703" : "#4cc9f0";
+      context.arc(projected.x, projected.y, isFace ? 4 : isHand ? 4.4 : 5.5, 0, Math.PI * 2);
+      context.fillStyle = isFace ? "#ffb703" : isHand ? "#90e0ef" : "#4cc9f0";
       context.fill();
       context.strokeStyle = "rgba(0, 0, 0, 0.3)";
       context.lineWidth = 1.5;

@@ -92,6 +92,18 @@ body {
   padding: 1rem 1.2rem;
 }
 
+.game-version-badge {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.4rem;
+  padding: 0.55rem 0.8rem;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.96rem;
+  letter-spacing: 0.12em;
+  color: #cbe6ff;
+  text-transform: uppercase;
+}
+
 .ai-health-panel {
   position: absolute;
   top: 1.4rem;
@@ -274,5 +286,9 @@ label,
   .hero-panel {
     width: 100%;
     margin-top: 4.8rem;
+  }
+
+  .game-version-badge {
+    right: 1rem;
   }
 }

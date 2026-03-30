@@ -74,6 +74,8 @@ describe("buildPoseOverlayPaths", () => {
     expect(filtered[1].visibility).toBe(0);
     expect(filtered[11].visibility).toBe(1);
     expect(filtered[15].visibility).toBe(1);
+    expect(filtered[19].visibility).toBe(1);
+    expect(filtered[22].visibility).toBe(1);
   });
 
   it("builds a debug snapshot with pre and post mirror coordinates", () => {
@@ -90,6 +92,6 @@ describe("buildPoseOverlayPaths", () => {
     expect(snapshot.probe?.landmarkLabel).toBe("nose");
     expect(snapshot.probe?.preMirrorPoint.x).toBeCloseTo(64);
     expect(snapshot.probe?.postMirrorPoint.x).toBeCloseTo(256);
-    expect(snapshot.overlayMirrorMode).toBe("coordinate");
+    expect(snapshot.overlayMirrorMode).toBe("full-mirror");
   });
 });

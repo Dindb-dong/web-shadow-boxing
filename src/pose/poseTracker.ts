@@ -7,7 +7,7 @@ import type { PoseFrame, PoseOverlayPoint, Vec3 } from "../types/game";
 
 const WASM_ROOT = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
 const MODEL_ASSET =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
 
 function landmarkToVec3(landmark: NormalizedLandmark | undefined): Vec3 | null {
   if (!landmark) {
@@ -43,8 +43,9 @@ export class PoseTracker {
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
-        width: { ideal: 960 },
-        height: { ideal: 540 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 60, max: 60 },
         facingMode: "user"
       }
     });
@@ -59,6 +60,9 @@ export class PoseTracker {
       baseOptions: {
         modelAssetPath: MODEL_ASSET
       },
+      minPoseDetectionConfidence: 0.65,
+      minPosePresenceConfidence: 0.65,
+      minTrackingConfidence: 0.65,
       numPoses: 1,
       runningMode: "VIDEO"
     });

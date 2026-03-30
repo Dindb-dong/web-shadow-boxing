@@ -1,3 +1,5 @@
+import { GAME_VERSION } from "../version";
+
 /** Creates the core DOM skeleton used by the app. */
 export function createAppShell(container: HTMLElement): {
   sceneHost: HTMLDivElement;
@@ -18,6 +20,7 @@ export function createAppShell(container: HTMLElement): {
     <div class="game-shell">
       <div class="scene-host"></div>
       <div class="hud-overlay">
+        <div class="hud-panel game-version-badge">v${GAME_VERSION}</div>
         <div class="hud-panel ai-health-panel">
           <div class="ai-health-header">
             <span class="eyebrow">Opponent Vital</span>
