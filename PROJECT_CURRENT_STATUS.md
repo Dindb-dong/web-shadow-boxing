@@ -4,7 +4,7 @@ Date: 2026-04-04
 
 ## Current Summary
 
-Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우저 클라이언트로 동작하며, 현재는 `사용자 MediaPipe 포즈 오버레이`, `실제 남성 파이터 GLB 아바타`, `좌/우 위빙 및 좌/우 더킹 기반 복싱 카운터 패턴`을 유지한 채 공격 판정/궤도 계산을 `/Users/maxkim/boxer_ai` 파이프라인 기준으로 교체했다. 브라우저에서는 MediaPipe Pose를 `20 FPS`로 상시 실행하고, `pose_world_landmarks`의 `어깨/팔꿈치/손목 6개 관절 xyz`를 사용해 boxer_ai와 동일하게 `어깨 중심 이동 + 어깨 거리 정규화 + EMA smoothing(beta=0.7) + 위치/속도/가속도 54차 feature + 최근 12-step window`를 만든다. 기존 `MockPredictor`와 `AttackDetector`는 제거했고, 대신 boxer_ai의 실제 GRU 체크포인트(`checkpoints/20260331_004346/gru_model.pt`)를 브라우저용 JSON 가중치로 export해 TypeScript 단일-layer GRU 런타임에서 직접 추론한다. 공격 궤도는 `idle -> attacking` 위협 엣지에서 한 번만 emit되고, 훅처럼 넓은 공격은 측면에서 중앙으로 더 크게 들어오도록 world mapping을 보정했다. AI 피격/회피 판정도 같은 trajectory와 같은 avatar hitbox 기준으로 맞춰졌고, HP가 0이 되면 즉시 다운 모션을 재생한다. MediaPipe task model도 원격 경로 대신 로컬 `public/assets/pose_landmarker_full.task`를 사용하도록 바꿨다.
+Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우저 클라이언트로 동작하며, 현재는 `사용자 MediaPipe 포즈 오버레이`, `실제 남성 파이터 GLB 아바타`, `좌/우 위빙 및 좌/우 더킹 기반 복싱 카운터 패턴`을 유지한 채 공격 판정/궤도 계산을 `/Users/maxkim/boxer_ai` 파이프라인 기준으로 교체했다. 브라우저에서는 MediaPipe Pose를 `20 FPS`로 상시 실행하고, `pose_world_landmarks`의 `어깨/팔꿈치/손목 6개 관절 xyz`를 사용해 boxer_ai와 동일하게 `어깨 중심 이동 + 어깨 거리 정규화 + EMA smoothing(beta=0.7) + 위치/속도/가속도 54차 feature + 최근 12-step window`를 만든다. 기존 `MockPredictor`와 `AttackDetector`는 제거했고, 대신 boxer_ai의 실제 GRU 체크포인트(`checkpoints/20260331_004346/gru_model.pt`)를 브라우저용 JSON 가중치로 export해 TypeScript 단일-layer GRU 런타임에서 직접 추론한다. 공격 궤도는 `idle -> attacking` 위협 엣지에서 한 번만 emit되고, 훅처럼 넓은 공격은 측면에서 중앙으로 더 크게 들어오도록 world mapping을 보정했다. AI 피격/회피 판정도 같은 trajectory와 같은 avatar hitbox 기준으로 맞춰졌고, avatarThreat가 성립하면 stamina가 남아 있는 한 랜덤 없이 바로 회피로 진입하도록 묶었다. HP가 0이 되면 즉시 다운 모션을 재생한다. MediaPipe task model도 원격 경로 대신 로컬 `public/assets/pose_landmarker_full.task`를 사용하도록 바꿨다.
 
 ## Current Behavior
 
@@ -17,7 +17,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 7. 디버그 HUD는 `nose -> wrists -> shoulders -> elbows` 우선순위로 보이는 랜드마크 하나를 probe로 선택하고, `pre/post` 세로 가이드와 `cover viewport` 경계선을 함께 그린다.
 8. 오버레이 실제 렌더링은 현재 mirrored webcam preview에 맞춰 모든 상체 랜드마크를 `post-mirror` 좌표로 그리는 상태다.
 9. AI는 임시 캡슐 지오메트리 대신 로컬 `public/assets/muscular_bodybuilder_boxing_fighter.glb` 남성 파이터 GLB 아바타를 로드하며, 카메라와 모델 위치를 조정해 골반 위 중심의 스파링 상대처럼 보이도록 연출한다.
-10. AI는 기본적으로 헤드 무브먼트와 가드 자세를 유지하고, 유저 공격이 시작되면 현재 스태미나 비율이 높을수록 더 높은 확률로 회피를 시도한다. 회피 좌우는 `궤적 중심 위치 + 횡방향 이동량` 신호를 섞어 확률적으로 고르고, 신호가 중립인 상황이 반복되면 이전과 반대 방향을 우선해 한쪽으로만 피하는 편향을 줄였다.
+10. AI는 기본적으로 헤드 무브먼트와 가드 자세를 유지하고, 유저 공격이 시작돼 `avatarThreat`가 성립하면 stamina가 남아 있는 한 랜덤 없이 즉시 회피를 시도한다. 회피 좌우는 `궤적 중심 위치 + 횡방향 이동량` 신호를 섞어 확률적으로 고르고, 신호가 중립인 상황이 반복되면 이전과 반대 방향을 우선해 한쪽으로만 피하는 편향을 줄였다.
 11. 회피에 성공한 경우에만 방향과 회피 종류에 맞는 정형화된 카운터 조합을 준비한다. 예를 들면 같은 방향 훅/어퍼 또는 반대손 스트레이트가 교대로 나온다.
 12. counter는 회피 직후 바로 적중 판정을 내는 것이 아니라, 회피 시점의 유저 얼굴 월드 좌표를 저장한 뒤 `0.3초 후`에 먼저 발사한다.
 13. counter 발사 `0.5초 후`에 유저가 그 목표 좌표에 남았는지(피격), 손/팔로 막았는지(block), z축 뒤로 빠졌는지(sway)를 판정한다.
@@ -37,18 +37,18 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 
 - 프론트엔드는 `src/pose`, `src/model`, `src/game`, `src/render`, `src/ui`, `src/types`로 역할을 분리했다.
 - `PoseSequenceBuffer`는 최근 3개 normalized pose와 최근 12개 feature frame을 유지하며 boxer_ai와 같은 모델 입력 window를 제공한다.
-- `CombatSystem`은 회피 확률 계산, 스태미나 회복/소모, avatar hitbox 기반 피격, 얼굴 좌표 기반 counter 타기팅, sway/block 판정, 세션 누적 전투 통계를 독립적으로 관리한다. 피격은 궤적 점 샘플뿐 아니라 점 사이 선분이 avatar hitbox를 통과하는 경우도 판정한다.
+- `CombatSystem`은 stamina 기반 강제 회피, 스태미나 회복/소모, avatar hitbox 기반 피격, 얼굴 좌표 기반 counter 타기팅, sway/block 판정, 세션 누적 전투 통계를 독립적으로 관리한다. 피격은 궤적 점 샘플뿐 아니라 점 사이 선분이 avatar hitbox를 통과하는 경우도 판정한다.
 - `ShadowboxingGame`은 raw predictor output을 매 샘플마다 계산하고, `threatAssessment.ts`에서 `attackStarted` 성격의 위협 엣지를 판정해 trajectory emit 시점을 제어한다. 같은 순간의 predictor output이 `CombatSystem`, trajectory render, Debug HUD, 브라우저 콘솔 로그에 공통으로 전달된다.
 - `worldMapping.ts`는 현재 pose landmark 자체를 world space로 옮기는 `mapBodyPointToWorld`와, normalized wrist trajectory를 상대 전투공간용 위협 경로로 투영하는 `trajectoryToWorld`를 분리된 역할로 운영한다. 후자는 어깨 anchor 대비 extension, horizon progress, x축 중앙 수렴, wide hook 감지 기반 측면 spread 유지, 얼굴 높이 pull, 상대 face plane depth projection을 함께 적용한다.
 - `PoseOverlayRenderer`가 비디오 원본 비율과 카드 비율 차이를 계산해 2D 캔버스를 보정한 뒤, 현재는 상체 랜드마크만 웹캠 프리뷰 위에 오버레이한다.
 - 비디오 엘리먼트는 CSS transform으로 좌우 반전하고, 오버레이는 `poseOverlay.ts`에서 같은 preview에 맞춘 full mirror(`1 - x`) 좌표로 모든 상체 랜드마크를 그린다. 같은 모듈에서 비교용 pre/post 좌표와 cover viewport 계측값도 함께 렌더링한다.
-- `CombatSystem`은 방향성 있는 dodge 타입과 structured counter move를 함께 관리하며, dodge 좌우를 궤적 위치/횡이동 기반 확률 샘플링으로 고른 뒤 중립 신호 반복 시 반대 방향으로 균형을 잡는다.
+- `CombatSystem`은 방향성 있는 dodge 타입과 structured counter move를 함께 관리하며, avatarThreat와 dodge 진입을 같은 분기로 묶어 stamina가 충분하면 항상 dodge를 우선한다. dodge 좌우는 궤적 위치/횡이동 기반 확률 샘플링으로 고른 뒤 중립 신호 반복 시 반대 방향으로 균형을 잡는다.
 - `CombatSystem`은 이제 `player HP + AI HP + AI stamina + successful hits + guarded counters`를 함께 관리하며, attack start, dodge roll, counter target, vulnerable window, counter launch/resolve 타이밍을 상태로 들고 간다.
 - Three.js 씬은 남성 파이터 GLB 캐릭터, 어두운 플랫폼 무대, 헤드 무브먼트, 미러링된 좌표계 기준의 붉은 궤도 시각화를 담당한다.
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. dodge 중에는 이동 방향 반대쪽 어깨가 리드되도록 별도 torso yaw/roll을 적용한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 counter 중에만 노출하고, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.2.8`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.0`으로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
@@ -67,7 +67,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 세션에서는 `/Users/maxkim/boxer_ai`의 README/전처리/GRU 구조를 기준으로 웹앱 공격 계산 체인을 전면 교체했다. `20 FPS 상시 MediaPipe`, `world landmark 기반 6관절 추출`, `normalize + smooth + 54차 feature + 12-step window`, `브라우저 내 GRU 추론`, `기존 2D 포즈 오버레이 유지`, `로컬 pose_landmarker_full.task 사용`까지 반영했고, 이후 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
 - 이번 추가 수정에서는 연속 `attacking` 출력 동안 trail을 계속 재생성하지 않도록 `threat rising edge`에서만 trajectory를 한 번 emit하도록 바꿨다. 동시에 AI 피격 판정은 기존 정적 face-only 기준을 버리고 `avatar hitbox` 기준으로 정리해, 화면상 아바타를 실제로 스친 trajectory가 HP 감소로 더 일관되게 이어지도록 조정했다. 이 변경 후에도 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 통과했다.
 - 이번 추가 디버그 수정에서는 브라우저 Debug HUD에 `left/right wrist visibility`, `prediction gated reason`, `raw attacking_prob`를 개별 라인으로 노출해 현장 카메라 세팅에서 오탐 원인을 바로 확인할 수 있게 했다. 이 변경 후에도 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 통과했다.
-- 이번 후속 수정에서는 남성 파이터 GLB 아바타를 `muscular_bodybuilder_boxing_fighter.glb`로 교체하고, 붉은 링 로프를 제거했으며, wide hook trajectory가 화면 측면에서 중앙으로 더 넓게 들어오도록 x축 수렴을 완화했다. 동시에 AI HP가 0이 되면 추가 방어 행동 없이 즉시 down/victory 모션을 재생하도록 정리했다. 이 변경 후 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 통과했고, 최종 버전 표기는 `1.2.8`이다.
+- 이번 후속 수정에서는 남성 파이터 GLB 아바타를 `muscular_bodybuilder_boxing_fighter.glb`로 교체하고, 붉은 링 로프를 제거했으며, wide hook trajectory가 화면 측면에서 중앙으로 더 넓게 들어오도록 x축 수렴을 완화했다. 동시에 AI 회피 로직을 avatarThreat 분기와 직접 묶어 stamina가 남아 있으면 랜덤 없이 바로 dodge로 들어가도록 바꿨고, AI HP가 0이 되면 추가 방어 행동 없이 즉시 down/victory 모션을 재생하도록 정리했다. 이 변경 후 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 통과했고, 최종 버전 표기는 `1.3.0`이다.
 
 ## Current Limitations
 
