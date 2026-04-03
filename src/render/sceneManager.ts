@@ -4,11 +4,13 @@ import { DODGE_DURATION_MS, TRAJECTORY_DISPLAY_MS } from "../game/constants";
 import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory } from "../types/game";
 
 const COUNTER_ANIMATION_MS = 460;
+const VICTORY_ANIMATION_MS = 1100;
 const THREAT_SEGMENT_POOL_SIZE = 100;
 const THREAT_SEGMENT_RADIUS = 0.045;
 const THREAT_SEGMENT_BASE_OPACITY = 0.72;
 const LEFT_GLOVE_HOME = new THREE.Vector3(-0.22, 1.42, -1.36);
 const RIGHT_GLOVE_HOME = new THREE.Vector3(0.26, 1.44, -1.34);
+const FIGHTER_ASSET_PATH = "/assets/muscular_bodybuilder_boxing_fighter.glb";
 
 interface PunchPose {
   leadX: number;
@@ -127,12 +129,14 @@ export class SceneManager {
   );
   private dodgeState: { type: DodgeType; startedAt: number } | null = null;
   private counterState: { startedAt: number; result: GuardResult; move: CounterMove; target: Vec3 } | null = null;
+  private victoryState: { startedAt: number } | null = null;
 
   constructor(private readonly host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(host.clientWidth, host.clientHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.shadowMap.enabled = true;
     this.host.appendChild(this.renderer.domElement);
     this.bootstrapScene();
     this.resize();
@@ -143,19 +147,23 @@ export class SceneManager {
     const loader = new GLTFLoader();
 
     try {
-      const fighter = (await loader.loadAsync("/assets/animated_human_by_get3dmodels.glb")).scene;
+      const fighter = (await loader.loadAsync(FIGHTER_ASSET_PATH)).scene;
       const bounds = new THREE.Box3().setFromObject(fighter);
       const size = bounds.getSize(new THREE.Vector3());
       const center = bounds.getCenter(new THREE.Vector3());
-      const targetHeight = 3.4;
+      const targetHeight = 3.2;
       const scale = size.y > 0 ? targetHeight / size.y : 1.4;
+      const yFloorOffset = bounds.min.y * scale;
       fighter.scale.setScalar(scale);
-      fighter.position.set(-center.x * scale, -bounds.min.y * scale - 1.55, -2.08 - center.z * scale * 0.2);
+      fighter.position.set(-center.x * scale, -yFloorOffset - 1.55, -2.04 - center.z * scale * 0.12);
       fighter.rotation.y = 0;
       fighter.traverse((child) => {
         if (child instanceof THREE.Mesh) {
           child.castShadow = true;
           child.receiveShadow = true;
+          child.material = Array.isArray(child.material)
+            ? child.material.map((material) => material.clone())
+            : child.material.clone();
         }
       });
       this.fallbackAvatar.visible = false;
@@ -177,11 +185,13 @@ export class SceneManager {
     const ambient = new THREE.AmbientLight(0xffffff, 0.75);
     const keyLight = new THREE.DirectionalLight(0xb2dbff, 1.35);
     keyLight.position.set(2.5, 4, 1.5);
+    keyLight.castShadow = true;
     const rimLight = new THREE.PointLight(0xff7a59, 2.4, 12, 2);
     rimLight.position.set(-1.5, 2.8, -2.5);
     const topLight = new THREE.SpotLight(0xffffff, 22, 20, 0.48, 0.6, 1.4);
     topLight.position.set(0, 5.5, -0.5);
     topLight.target.position.set(0, 1.4, -2.1);
+    topLight.castShadow = true;
     this.scene.add(ambient, keyLight, rimLight, topLight, topLight.target);
 
     const floor = new THREE.Mesh(
@@ -198,14 +208,6 @@ export class SceneManager {
     );
     ringPlatform.position.set(0, 0.09, -2.05);
     this.scene.add(ringPlatform);
-
-    const ropeMaterial = new THREE.MeshStandardMaterial({ color: 0xca2c44, roughness: 0.45, metalness: 0.15 });
-    for (const height of [0.86, 1.06, 1.26]) {
-      const rope = new THREE.Mesh(new THREE.TorusGeometry(2.08, 0.02, 8, 64), ropeMaterial);
-      rope.rotation.x = Math.PI / 2;
-      rope.position.set(0, height, -2.04);
-      this.scene.add(rope);
-    }
 
     const body = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.42, 1.15, 10, 20),
@@ -275,6 +277,19 @@ export class SceneManager {
     this.leftGlove.visible = true;
     this.rightGlove.visible = true;
     this.counterState = { move, result, target, startedAt: now };
+  }
+
+  /** Starts the opponent downed motion once the AI HP reaches zero. */
+  triggerVictory(now: number): void {
+    if (this.victoryState) {
+      return;
+    }
+
+    this.dodgeState = null;
+    this.counterState = null;
+    this.leftGlove.visible = false;
+    this.rightGlove.visible = false;
+    this.victoryState = { startedAt: now };
   }
 
   /** Advances scene animation and renders one frame. */
@@ -403,6 +418,21 @@ export class SceneManager {
       this.leftGlove.visible = false;
       this.rightGlove.visible = false;
       this.shadowPlane.scale.set(1, 1, 1);
+    }
+
+    if (this.victoryState) {
+      const progress = Math.min((now - this.victoryState.startedAt) / VICTORY_ANIMATION_MS, 1);
+      const impact = easeInOutSine(Math.min(progress / 0.32, 1));
+      const collapse = progress <= 0.18 ? 0 : easeInOutSine((progress - 0.18) / 0.82);
+      this.avatarGroup.position.x += 0.08 * impact + 0.42 * collapse;
+      this.avatarGroup.position.y += -0.1 * impact - 0.96 * collapse;
+      this.avatarGroup.position.z += 0.12 * collapse;
+      this.avatarGroup.rotation.x += -0.14 * impact - 0.42 * collapse;
+      this.avatarGroup.rotation.y += -0.18 * impact - 0.22 * collapse;
+      this.avatarGroup.rotation.z += 0.2 * impact + 1.32 * collapse;
+      this.avatarVisualGroup.rotation.x += -0.08 * collapse;
+      this.avatarVisualGroup.rotation.z += 0.16 * collapse;
+      this.shadowPlane.scale.set(1.08 + collapse * 0.54, 0.94 + collapse * 0.28, 1);
     }
   }
 

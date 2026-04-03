@@ -36,4 +36,35 @@ describe("worldMapping", () => {
     expect(Math.abs(world[0][5].x)).toBeLessThan(Math.abs(world[0][0].x));
     expect(world[0][5].y).toBeGreaterThan(world[1][5].y);
   });
+
+  it("keeps wide hook-like punches entering from the edge instead of collapsing into a narrow lane", () => {
+    const world = trajectoryToWorld(
+      [
+        [
+          { x: -0.72, y: 0.06, z: -0.26 },
+          { x: -0.66, y: 0.08, z: -0.34 },
+          { x: -0.58, y: 0.09, z: -0.44 },
+          { x: -0.48, y: 0.11, z: -0.54 },
+          { x: -0.38, y: 0.12, z: -0.62 },
+          { x: -0.28, y: 0.14, z: -0.7 }
+        ],
+        [
+          { x: 0.52, y: -0.14, z: -0.08 },
+          { x: 0.53, y: -0.14, z: -0.09 },
+          { x: 0.54, y: -0.15, z: -0.1 },
+          { x: 0.54, y: -0.15, z: -0.11 },
+          { x: 0.54, y: -0.15, z: -0.11 },
+          { x: 0.54, y: -0.15, z: -0.11 }
+        ]
+      ],
+      {
+        shoulderCenter: { x: 0, y: 0, z: 0 },
+        shoulderScale: 1
+      }
+    );
+
+    expect(Math.abs(world[0][0].x)).toBeGreaterThan(1.5);
+    expect(Math.abs(world[0][5].x)).toBeGreaterThan(0.35);
+    expect(Math.abs(world[0][5].x)).toBeLessThan(Math.abs(world[0][0].x));
+  });
 });

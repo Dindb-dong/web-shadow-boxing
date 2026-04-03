@@ -13,6 +13,7 @@ const THREAT_FACE_Y = 1.78;
 const THREAT_REACH_MIN = 0.5;
 const THREAT_REACH_RANGE = 0.3;
 const THREAT_X_COMPRESSION = 0.16;
+const THREAT_WIDE_X_COMPRESSION = 0.54;
 const THREAT_Y_PULL = 0.42;
 
 /** Moves denormalized user-body coordinates into the stylized Three.js combat space. */
@@ -33,19 +34,31 @@ function computeThreatReach(step: Vec3, wristIndex: number, stepIndex: number, s
   return clamp(extensionAlpha * 0.78 + horizonAlpha * 0.22, 0, 1);
 }
 
+/** Detects wide hook-like wrist paths so side punches keep more lateral spread on screen. */
+function computeWideArcAlpha(wristSteps: Vec3[]): number {
+  const maxAbsX = wristSteps.reduce((max, step) => Math.max(max, Math.abs(step.x)), 0);
+  const lateralTravel = Math.abs(wristSteps[wristSteps.length - 1].x - wristSteps[0].x);
+  const maxAbsAlpha = clamp((maxAbsX - 0.4) / 0.28, 0, 1);
+  const travelAlpha = clamp((lateralTravel - 0.14) / 0.26, 0, 1);
+  return clamp(maxAbsAlpha * 0.7 + travelAlpha * 0.3, 0, 1);
+}
+
 /** Restores model output and projects punch threats into opponent-facing world space. */
 export function trajectoryToWorld(traj: WristPairTrajectory, basis: Basis): WristPairTrajectory {
-  return traj.map((wristSteps, wristIndex) =>
-    wristSteps.map((step, stepIndex) => {
+  return traj.map((wristSteps, wristIndex) => {
+    const wideArcAlpha = computeWideArcAlpha(wristSteps);
+    const terminalCompression = lerp(THREAT_X_COMPRESSION, THREAT_WIDE_X_COMPRESSION, wideArcAlpha);
+
+    return wristSteps.map((step, stepIndex) => {
       const worldPoint = mapBodyPointToWorld(denormalizePoint(step, basis));
       const reachAlpha = computeThreatReach(step, wristIndex, stepIndex, wristSteps.length);
-      const lateralCompression = lerp(1, THREAT_X_COMPRESSION, reachAlpha);
+      const lateralCompression = lerp(1, terminalCompression, reachAlpha);
 
       return {
         x: worldPoint.x * lateralCompression,
         y: lerp(worldPoint.y, THREAT_FACE_Y, reachAlpha * THREAT_Y_PULL),
         z: lerp(THREAT_GUARD_PLANE_Z, THREAT_FACE_PLANE_Z, reachAlpha)
       };
-    })
-  ) as WristPairTrajectory;
+    });
+  }) as WristPairTrajectory;
 }

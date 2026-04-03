@@ -433,4 +433,51 @@ describe("combatSystem", () => {
     expect(first.triggerDodge?.startsWith("left")).toBe(true);
     expect(second.triggerDodge?.startsWith("right")).toBe(true);
   });
+
+  it("stays down and stops launching fresh defense once the AI hp reaches zero", () => {
+    const system = new CombatSystem(() => 0.99);
+    let latest = system.update({
+      now: 0,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("idle", 0.1),
+      worldTraj: createBodyThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    for (let index = 0; index < 8; index += 1) {
+      latest = system.update({
+        now: 100 + index * 200,
+        modelMode: "mock",
+        tracking: true,
+        output: createOutput("attacking", 0.92),
+        worldTraj: createBodyThreatTrajectory(),
+        userPose: createGuardPose(false)
+      });
+      system.update({
+        now: 220 + index * 200,
+        modelMode: "mock",
+        tracking: true,
+        output: createOutput("idle", 0.1),
+        worldTraj: createBodyThreatTrajectory(),
+        userPose: createGuardPose(false)
+      });
+    }
+
+    const afterDown = system.update({
+      now: 1900,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.95),
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    expect(latest.snapshot.aiHp).toBe(0);
+    expect(latest.snapshot.statusText).toContain("Victory");
+    expect(afterDown.triggerDodge).toBeNull();
+    expect(afterDown.triggerCounter).toBeNull();
+    expect(afterDown.snapshot.aiHp).toBe(0);
+    expect(afterDown.snapshot.statusText).toContain("Victory");
+  });
 });

@@ -258,6 +258,23 @@ export class CombatSystem {
       attackStartedEdge: false
     };
 
+    if (this.aiHp <= 0) {
+      this.statusText = "Victory. AI is down";
+      this.threatExpiresAt = null;
+      this.threatStateName = "idle";
+      this.threatProbability = 0;
+      this.attackActive = false;
+      this.attackResolved = true;
+      this.cancelCounter();
+      this.dodgeType = null;
+      return {
+        snapshot: this.createSnapshot(modelMode, tracking),
+        triggerDodge,
+        triggerCounter,
+        debug
+      };
+    }
+
     if (!tracking || !output || !worldTraj) {
       this.statusText = tracking ? "Collecting model-ready frames" : "Tracking lost";
       this.threatExpiresAt = null;
@@ -301,7 +318,7 @@ export class CombatSystem {
       this.applyAiHit(AI_COUNTER_VULNERABLE_HIT_DAMAGE);
       this.cancelCounter();
       this.attackResolved = true;
-      this.statusText = this.aiHp > 0 ? "You punished the AI during its counter" : "AI is down";
+      this.statusText = this.aiHp > 0 ? "You punished the AI during its counter" : "Victory. AI is down";
     } else if (attackStarted && !this.attackResolved && avatarThreat) {
       if (this.counterState === "idle" && this.dodgeType === null) {
         const dodgeChance = computeDodgeChance(this.aiStamina, output.attacking_prob);
@@ -327,12 +344,12 @@ export class CombatSystem {
         } else {
           this.applyAiHit(AI_HIT_DAMAGE);
           this.attackResolved = true;
-          this.statusText = this.aiHp > 0 ? "Your punch landed on the AI" : "AI is down";
+          this.statusText = this.aiHp > 0 ? "Your punch landed on the AI" : "Victory. AI is down";
         }
       } else {
         this.applyAiHit(AI_HIT_DAMAGE);
         this.attackResolved = true;
-        this.statusText = this.aiHp > 0 ? "Your punch caught the AI mid-motion" : "AI is down";
+        this.statusText = this.aiHp > 0 ? "Your punch caught the AI mid-motion" : "Victory. AI is down";
       }
     } else if (threatening && this.counterState === "primed") {
       this.statusText = this.counterLaunchAt !== null ? "AI counter is locked on your last head position" : "AI counter is in motion";
@@ -420,6 +437,16 @@ export class CombatSystem {
     this.aiHp = Math.max(this.aiHp - damage, 0);
     this.successfulHits += 1;
     this.lastGuardResult = "none";
+    if (this.aiHp === 0) {
+      this.statusText = "Victory. AI is down";
+      this.threatExpiresAt = null;
+      this.threatStateName = "idle";
+      this.threatProbability = 0;
+      this.attackActive = false;
+      this.attackResolved = true;
+      this.cancelCounter();
+      this.dodgeType = null;
+    }
   }
 
   /** Cancels the currently primed counter after the AI gets interrupted. */

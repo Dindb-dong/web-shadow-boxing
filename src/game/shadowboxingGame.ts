@@ -344,6 +344,10 @@ export class ShadowboxingGame {
         );
         this.recordDebugEvent(now, `AI counter -> ${combatUpdate.triggerCounter.move}`);
       }
+      if (combatUpdate.snapshot.aiHp <= 0 && this.latestHudSnapshot.aiHp > 0) {
+        this.scene.triggerVictory(now);
+        this.recordDebugEvent(now, "Victory -> AI down");
+      }
 
       this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);
     } finally {
