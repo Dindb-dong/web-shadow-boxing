@@ -17,6 +17,22 @@ export class HudController {
       playerHpBar: HTMLDivElement;
       aiStaminaBar: HTMLDivElement;
       guardValue: HTMLSpanElement;
+      debugRawThreatValue: HTMLSpanElement;
+      debugRawAttackingProbValue: HTMLSpanElement;
+      debugTrajectoryEmitRawProbValue: HTMLSpanElement;
+      debugStableThreatValue: HTMLSpanElement;
+      debugWristsVisibleValue: HTMLSpanElement;
+      debugLeftWristVisibilityValue: HTMLSpanElement;
+      debugRightWristVisibilityValue: HTMLSpanElement;
+      debugPredictionGatedValue: HTMLSpanElement;
+      debugCombatHitboxOverlapValue: HTMLSpanElement;
+      debugDodgeChanceRollValue: HTMLSpanElement;
+      debugAttackStartedEdgeValue: HTMLSpanElement;
+      debugAssessmentAgeValue: HTMLSpanElement;
+      debugRefreshCountValue: HTMLSpanElement;
+      debugEmitCountValue: HTMLSpanElement;
+      debugLastEventValue: HTMLParagraphElement;
+      debugLogValue: HTMLPreElement;
     }
   ) {}
 
@@ -36,5 +52,21 @@ export class HudController {
     this.refs.guardValue.textContent = snapshot.lastGuardResult;
     this.refs.playerHpBar.style.width = `${clamp(snapshot.playerHp, 0, 100)}%`;
     this.refs.aiStaminaBar.style.width = `${clamp(snapshot.aiStamina, 0, 100)}%`;
+    this.refs.debugRawThreatValue.textContent = snapshot.debug.rawThreatLabel;
+    this.refs.debugRawAttackingProbValue.textContent = snapshot.debug.rawAttackingProbLabel;
+    this.refs.debugTrajectoryEmitRawProbValue.textContent = snapshot.debug.trajectoryEmitRawProbLabel;
+    this.refs.debugStableThreatValue.textContent = snapshot.debug.stableThreatLabel;
+    this.refs.debugWristsVisibleValue.textContent = snapshot.debug.wristsVisibleLabel;
+    this.refs.debugLeftWristVisibilityValue.textContent = snapshot.debug.leftWristVisibilityLabel;
+    this.refs.debugRightWristVisibilityValue.textContent = snapshot.debug.rightWristVisibilityLabel;
+    this.refs.debugPredictionGatedValue.textContent = snapshot.debug.predictionGatedLabel;
+    this.refs.debugCombatHitboxOverlapValue.textContent = snapshot.debug.combatHitboxOverlapLabel;
+    this.refs.debugDodgeChanceRollValue.textContent = snapshot.debug.dodgeChanceRollLabel;
+    this.refs.debugAttackStartedEdgeValue.textContent = snapshot.debug.attackStartedEdgeLabel;
+    this.refs.debugAssessmentAgeValue.textContent = snapshot.debug.assessmentAgeLabel;
+    this.refs.debugRefreshCountValue.textContent = snapshot.debug.refreshCountLabel;
+    this.refs.debugEmitCountValue.textContent = snapshot.debug.emitCountLabel;
+    this.refs.debugLastEventValue.textContent = snapshot.debug.lastEventLabel;
+    this.refs.debugLogValue.textContent = snapshot.debug.logLines.join("\n");
   }
 }

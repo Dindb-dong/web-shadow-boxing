@@ -20,6 +20,16 @@ describe("createAppShell", () => {
     expect(root?.textContent).toContain(`v${GAME_VERSION}`);
     expect(root?.textContent).toContain("Successful Hits");
     expect(root?.textContent).toContain("Defended Counters");
+    expect(root?.textContent).toContain("Debug HUD");
+    expect(root?.textContent).toContain("Raw Attacking Prob");
+    expect(root?.textContent).toContain("Last Emit Raw Prob");
+    expect(root?.textContent).toContain("Left Wrist Vis");
+    expect(root?.textContent).toContain("Right Wrist Vis");
+    expect(root?.textContent).toContain("Prediction Gated");
+    expect(root?.textContent).toContain("Combat Overlap");
+    expect(root?.textContent).toContain("Dodge Chance/Roll");
+    expect(root?.textContent).toContain("AttackStarted Edge");
     expect(shell.statusValue.textContent).toContain("Camera");
+    expect(shell.debugLogValue.textContent).toContain("Booting debug HUD");
   });
 });

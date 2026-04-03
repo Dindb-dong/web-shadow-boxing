@@ -17,6 +17,22 @@ export function createAppShell(container: HTMLElement): {
   playerHpBar: HTMLDivElement;
   aiStaminaBar: HTMLDivElement;
   guardValue: HTMLSpanElement;
+  debugRawThreatValue: HTMLSpanElement;
+  debugRawAttackingProbValue: HTMLSpanElement;
+  debugTrajectoryEmitRawProbValue: HTMLSpanElement;
+  debugStableThreatValue: HTMLSpanElement;
+  debugWristsVisibleValue: HTMLSpanElement;
+  debugLeftWristVisibilityValue: HTMLSpanElement;
+  debugRightWristVisibilityValue: HTMLSpanElement;
+  debugPredictionGatedValue: HTMLSpanElement;
+  debugCombatHitboxOverlapValue: HTMLSpanElement;
+  debugDodgeChanceRollValue: HTMLSpanElement;
+  debugAttackStartedEdgeValue: HTMLSpanElement;
+  debugAssessmentAgeValue: HTMLSpanElement;
+  debugRefreshCountValue: HTMLSpanElement;
+  debugEmitCountValue: HTMLSpanElement;
+  debugLastEventValue: HTMLParagraphElement;
+  debugLogValue: HTMLPreElement;
 } {
   container.innerHTML = `
     <div class="game-shell">
@@ -39,6 +55,25 @@ export function createAppShell(container: HTMLElement): {
           <p class="eyebrow">Shadowboxing Partner</p>
           <h1>Live Sparring Arena</h1>
           <p class="status-line" data-role="status">Camera warmup in progress</p>
+        </div>
+        <div class="hud-panel debug-panel">
+          <p class="eyebrow">Debug HUD</p>
+          <div class="metric-row"><span>Raw Threat</span><strong data-role="debug-raw-threat">idle / 0.00</strong></div>
+          <div class="metric-row"><span>Raw Attacking Prob</span><strong data-role="debug-raw-attacking-prob">0.00</strong></div>
+          <div class="metric-row"><span>Last Emit Raw Prob</span><strong data-role="debug-emit-raw-prob">n/a</strong></div>
+          <div class="metric-row"><span>Stable Threat</span><strong data-role="debug-stable-threat">idle / 0.00</strong></div>
+          <div class="metric-row"><span>Wrists Visible</span><strong data-role="debug-wrists-visible">no</strong></div>
+          <div class="metric-row"><span>Left Wrist Vis</span><strong data-role="debug-left-wrist-visibility">0.00</strong></div>
+          <div class="metric-row"><span>Right Wrist Vis</span><strong data-role="debug-right-wrist-visibility">0.00</strong></div>
+          <div class="metric-row"><span>Prediction Gated</span><strong data-role="debug-prediction-gated">booting</strong></div>
+          <div class="metric-row"><span>Combat Overlap</span><strong data-role="debug-combat-hitbox-overlap">n/a</strong></div>
+          <div class="metric-row"><span>Dodge Chance/Roll</span><strong data-role="debug-dodge-chance-roll">n/a</strong></div>
+          <div class="metric-row"><span>AttackStarted Edge</span><strong data-role="debug-attack-started-edge">no</strong></div>
+          <div class="metric-row"><span>Assessment Age</span><strong data-role="debug-assessment-age">n/a</strong></div>
+          <div class="metric-row"><span>Refresh Count</span><strong data-role="debug-refresh-count">0</strong></div>
+          <div class="metric-row"><span>Trajectory Emits</span><strong data-role="debug-emit-count">0</strong></div>
+          <p class="debug-last-event" data-role="debug-last-event">Booting debug HUD</p>
+          <pre class="debug-log" data-role="debug-log">Booting debug HUD</pre>
         </div>
         <div class="hud-grid">
           <div class="hud-panel video-panel">
@@ -85,6 +120,22 @@ export function createAppShell(container: HTMLElement): {
   const playerHpBar = container.querySelector<HTMLDivElement>("[data-role='player-hp']");
   const aiStaminaBar = container.querySelector<HTMLDivElement>("[data-role='ai-stamina']");
   const guardValue = container.querySelector<HTMLSpanElement>("[data-role='guard']");
+  const debugRawThreatValue = container.querySelector<HTMLSpanElement>("[data-role='debug-raw-threat']");
+  const debugRawAttackingProbValue = container.querySelector<HTMLSpanElement>("[data-role='debug-raw-attacking-prob']");
+  const debugTrajectoryEmitRawProbValue = container.querySelector<HTMLSpanElement>("[data-role='debug-emit-raw-prob']");
+  const debugStableThreatValue = container.querySelector<HTMLSpanElement>("[data-role='debug-stable-threat']");
+  const debugWristsVisibleValue = container.querySelector<HTMLSpanElement>("[data-role='debug-wrists-visible']");
+  const debugLeftWristVisibilityValue = container.querySelector<HTMLSpanElement>("[data-role='debug-left-wrist-visibility']");
+  const debugRightWristVisibilityValue = container.querySelector<HTMLSpanElement>("[data-role='debug-right-wrist-visibility']");
+  const debugPredictionGatedValue = container.querySelector<HTMLSpanElement>("[data-role='debug-prediction-gated']");
+  const debugCombatHitboxOverlapValue = container.querySelector<HTMLSpanElement>("[data-role='debug-combat-hitbox-overlap']");
+  const debugDodgeChanceRollValue = container.querySelector<HTMLSpanElement>("[data-role='debug-dodge-chance-roll']");
+  const debugAttackStartedEdgeValue = container.querySelector<HTMLSpanElement>("[data-role='debug-attack-started-edge']");
+  const debugAssessmentAgeValue = container.querySelector<HTMLSpanElement>("[data-role='debug-assessment-age']");
+  const debugRefreshCountValue = container.querySelector<HTMLSpanElement>("[data-role='debug-refresh-count']");
+  const debugEmitCountValue = container.querySelector<HTMLSpanElement>("[data-role='debug-emit-count']");
+  const debugLastEventValue = container.querySelector<HTMLParagraphElement>("[data-role='debug-last-event']");
+  const debugLogValue = container.querySelector<HTMLPreElement>("[data-role='debug-log']");
 
   if (
     !sceneHost ||
@@ -101,7 +152,23 @@ export function createAppShell(container: HTMLElement): {
     !statusValue ||
     !playerHpBar ||
     !aiStaminaBar ||
-    !guardValue
+    !guardValue ||
+    !debugRawThreatValue ||
+    !debugRawAttackingProbValue ||
+    !debugTrajectoryEmitRawProbValue ||
+    !debugStableThreatValue ||
+    !debugWristsVisibleValue ||
+    !debugLeftWristVisibilityValue ||
+    !debugRightWristVisibilityValue ||
+    !debugPredictionGatedValue ||
+    !debugCombatHitboxOverlapValue ||
+    !debugDodgeChanceRollValue ||
+    !debugAttackStartedEdgeValue ||
+    !debugAssessmentAgeValue ||
+    !debugRefreshCountValue ||
+    !debugEmitCountValue ||
+    !debugLastEventValue ||
+    !debugLogValue
   ) {
     throw new Error("App shell could not be created.");
   }
@@ -121,6 +188,22 @@ export function createAppShell(container: HTMLElement): {
     statusValue,
     playerHpBar,
     aiStaminaBar,
-    guardValue
+    guardValue,
+    debugRawThreatValue,
+    debugRawAttackingProbValue,
+    debugTrajectoryEmitRawProbValue,
+    debugStableThreatValue,
+    debugWristsVisibleValue,
+    debugLeftWristVisibilityValue,
+    debugRightWristVisibilityValue,
+    debugPredictionGatedValue,
+    debugCombatHitboxOverlapValue,
+    debugDodgeChanceRollValue,
+    debugAttackStartedEdgeValue,
+    debugAssessmentAgeValue,
+    debugRefreshCountValue,
+    debugEmitCountValue,
+    debugLastEventValue,
+    debugLogValue
   };
 }
