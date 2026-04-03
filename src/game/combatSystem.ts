@@ -1,7 +1,5 @@
 import {
   AI_COUNTER_VULNERABLE_HIT_DAMAGE,
-  AI_DODGE_CHANCE_MAX,
-  AI_DODGE_CHANCE_MIN,
   AI_HIT_DAMAGE,
   AI_HP_MAX,
   AI_STAMINA_DODGE_COST,
@@ -114,18 +112,6 @@ function trajectoryIntersectsAvatar(traj: WristPairTrajectory): boolean {
 /** Converts the user's current head position into scene world coordinates. */
 function resolveCounterTarget(pose: ResolvedPoseFrame | null): Vec3 | null {
   return pose ? mapBodyPointToWorld(pose.nose) : null;
-}
-
-/** Computes the AI dodge chance from its current stamina and the detected attack confidence. */
-function computeDodgeChance(aiStamina: number, attackingProb: number): number {
-  const staminaRatio = clamp(aiStamina / AI_STAMINA_MAX, 0, 1);
-  const attackBias = clamp((attackingProb - THREAT_PROBABILITY_THRESHOLD) * 0.22, 0, 0.12);
-
-  return clamp(
-    AI_DODGE_CHANCE_MIN + staminaRatio * (AI_DODGE_CHANCE_MAX - AI_DODGE_CHANCE_MIN) + attackBias,
-    AI_DODGE_CHANCE_MIN,
-    AI_DODGE_CHANCE_MAX
-  );
 }
 
 /** Chooses a dodge side from threat position and lateral wrist travel. */
@@ -321,11 +307,9 @@ export class CombatSystem {
       this.statusText = this.aiHp > 0 ? "You punished the AI during its counter" : "Victory. AI is down";
     } else if (attackStarted && !this.attackResolved && avatarThreat) {
       if (this.counterState === "idle" && this.dodgeType === null) {
-        const dodgeChance = computeDodgeChance(this.aiStamina, output.attacking_prob);
-        const dodgeRoll = this.random();
-        const canDodge = this.aiStamina >= AI_STAMINA_DODGE_COST && dodgeRoll <= dodgeChance;
-        debug.dodgeChance = dodgeChance;
-        debug.dodgeRoll = dodgeRoll;
+        const canDodge = this.aiStamina >= AI_STAMINA_DODGE_COST;
+        debug.dodgeChance = canDodge ? 1 : 0;
+        debug.dodgeRoll = canDodge ? 0 : 1;
 
         if (canDodge) {
           this.aiStamina -= AI_STAMINA_DODGE_COST;

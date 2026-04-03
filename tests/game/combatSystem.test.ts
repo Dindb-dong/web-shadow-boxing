@@ -138,6 +138,10 @@ function createSwayBackPose(): ResolvedPoseFrame {
   };
 }
 
+function setAiStamina(system: CombatSystem, value: number): void {
+  (system as unknown as { aiStamina: number }).aiStamina = value;
+}
+
 describe("combatSystem", () => {
   it("dodges, launches a counter first, then resolves hit/guard on a later tick", () => {
     const system = new CombatSystem(() => 0);
@@ -288,13 +292,16 @@ describe("combatSystem", () => {
     expect(result.snapshot.successfulHits).toBe(0);
   });
 
-  it("lands a clean hit on the AI face when the dodge roll fails", () => {
-    const system = new CombatSystem(() => 0.99);
+  it("lands a clean hit on the AI face when stamina is too low to dodge", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+    setAiStamina(system, 0);
+
     const result = system.update({
       now: 100,
       modelMode: "mock",
       tracking: true,
-      output: createOutput("attacking", 0.9),
+      output,
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
@@ -343,7 +350,8 @@ describe("combatSystem", () => {
   });
 
   it("applies damage when the trajectory intersects the visible AI torso even if it misses the face", () => {
-    const system = new CombatSystem(() => 0.99);
+    const system = new CombatSystem(() => 0);
+    setAiStamina(system, 0);
     const result = system.update({
       now: 100,
       modelMode: "mock",
@@ -359,7 +367,8 @@ describe("combatSystem", () => {
   });
 
   it("applies AI damage when a trajectory segment crosses the face hitbox between sampled points", () => {
-    const system = new CombatSystem(() => 0.99);
+    const system = new CombatSystem(() => 0);
+    setAiStamina(system, 0);
     const result = system.update({
       now: 100,
       modelMode: "mock",
