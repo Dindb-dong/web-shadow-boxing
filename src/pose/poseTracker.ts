@@ -3,37 +3,46 @@ import {
   PoseLandmarker,
   type NormalizedLandmark
 } from "@mediapipe/tasks-vision";
+import { SAMPLE_INTERVAL_MS } from "../game/constants";
 import type { PoseFrame, PoseOverlayPoint, Vec3 } from "../types/game";
 
 const WASM_ROOT = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
-const MODEL_ASSET =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
+const MODEL_ASSET = "/assets/pose_landmarker_full.task";
+const SHOULDER_VISIBILITY_THRESHOLD = 0.45;
+const ELBOW_VISIBILITY_THRESHOLD = 0.45;
+const WRIST_VISIBILITY_THRESHOLD = 0.55;
 
-function landmarkToVec3(landmark: NormalizedLandmark | undefined): Vec3 | null {
-  if (!landmark) {
+function worldLandmarkToVec3(
+  worldLandmark: NormalizedLandmark | undefined,
+  imageLandmark: NormalizedLandmark | undefined,
+  minVisibility: number
+): Vec3 | null {
+  if (!worldLandmark || !imageLandmark) {
     return null;
   }
 
-  const visibility = landmark.visibility ?? 1;
-  if (visibility < 0.35) {
+  if ((imageLandmark.visibility ?? 1) < minVisibility) {
     return null;
   }
 
   return {
-    x: landmark.x - 0.5,
-    y: 0.5 - landmark.y,
-    z: landmark.z
+    x: worldLandmark.x,
+    y: worldLandmark.y,
+    z: worldLandmark.z
   };
 }
 
-/** Owns webcam access and MediaPipe pose inference for the browser runtime. */
+/** Owns webcam access and a continuously running 20 FPS MediaPipe pose stream. */
 export class PoseTracker {
   private poseLandmarker: PoseLandmarker | null = null;
   private stream: MediaStream | null = null;
   private video: HTMLVideoElement | null = null;
   private lastOverlayPoints: PoseOverlayPoint[] = [];
+  private latestPoseFrame: PoseFrame | null = null;
+  private samplingTimer: number | null = null;
+  private disposed = false;
 
-  /** Requests webcam access and loads the pose landmarker assets. */
+  /** Requests webcam access, loads MediaPipe, and starts the continuous sampling loop. */
   async initialize(video: HTMLVideoElement): Promise<void> {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error("This browser does not support webcam access.");
@@ -45,7 +54,7 @@ export class PoseTracker {
       video: {
         width: { ideal: 1280 },
         height: { ideal: 720 },
-        frameRate: { ideal: 60, max: 60 },
+        frameRate: { ideal: 20, max: 20 },
         facingMode: "user"
       }
     });
@@ -60,57 +69,97 @@ export class PoseTracker {
       baseOptions: {
         modelAssetPath: MODEL_ASSET
       },
-      minPoseDetectionConfidence: 0.65,
-      minPosePresenceConfidence: 0.65,
-      minTrackingConfidence: 0.65,
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
       numPoses: 1,
       runningMode: "VIDEO"
     });
+
+    this.disposed = false;
+    this.scheduleSampleLoop();
   }
 
-  /** Samples one pose frame from the current video stream. */
-  sample(timestamp: number): PoseFrame | null {
-    if (!this.poseLandmarker || !this.video || this.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      return null;
-    }
-
-    const result = this.poseLandmarker.detectForVideo(this.video, timestamp);
-    const landmarks = result.landmarks[0];
-
-    if (!landmarks) {
-      this.lastOverlayPoints = [];
-      return null;
-    }
-
-    this.lastOverlayPoints = landmarks.map((landmark) => ({
-      x: landmark.x,
-      y: landmark.y,
-      visibility: landmark.visibility ?? 1
-    }));
-
-    return {
-      timestamp,
-      nose: landmarkToVec3(landmarks[0]),
-      leftShoulder: landmarkToVec3(landmarks[11]),
-      leftElbow: landmarkToVec3(landmarks[13]),
-      leftWrist: landmarkToVec3(landmarks[15]),
-      rightShoulder: landmarkToVec3(landmarks[12]),
-      rightElbow: landmarkToVec3(landmarks[14]),
-      rightWrist: landmarkToVec3(landmarks[16])
-    };
+  /** Returns the latest cached world-landmark pose from the background MediaPipe loop. */
+  sample(): PoseFrame | null {
+    return this.latestPoseFrame ? { ...this.latestPoseFrame } : null;
   }
 
-  /** Returns the latest normalized landmark list for 2D pose overlay rendering. */
+  /** Returns the latest normalized image-landmark list for overlay rendering. */
   getLastOverlayPoints(): PoseOverlayPoint[] {
     return [...this.lastOverlayPoints];
   }
 
-  /** Releases camera and model resources. */
+  private scheduleSampleLoop(): void {
+    this.samplingTimer = window.setTimeout(() => {
+      this.runSampleStep();
+      if (!this.disposed) {
+        this.scheduleSampleLoop();
+      }
+    }, SAMPLE_INTERVAL_MS);
+  }
+
+  private runSampleStep(): void {
+    if (
+      !this.poseLandmarker ||
+      !this.video ||
+      this.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+    ) {
+      return;
+    }
+
+    const result = this.poseLandmarker.detectForVideo(this.video, performance.now());
+    const overlayLandmarks = result.landmarks[0];
+    const worldLandmarks = result.worldLandmarks[0];
+
+    this.lastOverlayPoints = overlayLandmarks
+      ? overlayLandmarks.map((landmark) => ({
+          x: landmark.x,
+          y: landmark.y,
+          visibility: landmark.visibility ?? 1
+        }))
+      : [];
+
+    if (!overlayLandmarks || !worldLandmarks) {
+      this.latestPoseFrame = null;
+      return;
+    }
+
+    this.latestPoseFrame = {
+      timestamp: performance.now(),
+      nose: worldLandmarkToVec3(worldLandmarks[0], overlayLandmarks[0], SHOULDER_VISIBILITY_THRESHOLD),
+      leftShoulder: worldLandmarkToVec3(
+        worldLandmarks[11],
+        overlayLandmarks[11],
+        SHOULDER_VISIBILITY_THRESHOLD
+      ),
+      leftElbow: worldLandmarkToVec3(worldLandmarks[13], overlayLandmarks[13], ELBOW_VISIBILITY_THRESHOLD),
+      leftWrist: worldLandmarkToVec3(worldLandmarks[15], overlayLandmarks[15], WRIST_VISIBILITY_THRESHOLD),
+      rightShoulder: worldLandmarkToVec3(
+        worldLandmarks[12],
+        overlayLandmarks[12],
+        SHOULDER_VISIBILITY_THRESHOLD
+      ),
+      rightElbow: worldLandmarkToVec3(worldLandmarks[14], overlayLandmarks[14], ELBOW_VISIBILITY_THRESHOLD),
+      rightWrist: worldLandmarkToVec3(worldLandmarks[16], overlayLandmarks[16], WRIST_VISIBILITY_THRESHOLD)
+    };
+  }
+
+  /** Releases camera, model, and the background sampling loop. */
   dispose(): void {
+    this.disposed = true;
+    if (this.samplingTimer !== null) {
+      window.clearTimeout(this.samplingTimer);
+      this.samplingTimer = null;
+    }
+
     this.poseLandmarker?.close();
     this.poseLandmarker = null;
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
+    this.latestPoseFrame = null;
+    this.lastOverlayPoints = [];
+
     if (this.video) {
       this.video.srcObject = null;
     }

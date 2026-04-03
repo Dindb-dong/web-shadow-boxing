@@ -1,11 +1,13 @@
 import {
   PoseSequenceBuffer,
+  buildFeatureFrame,
   buildFeatureSequence,
   createBasis,
   denormalizePoint,
   normalizePoint,
   normalizePoseFrame,
-  resolvePoseFrame
+  resolvePoseFrame,
+  smoothPoseFrame
 } from "../../src/pose/featureEngineering";
 import type { PoseFrame, ResolvedPoseFrame } from "../../src/types/game";
 
@@ -37,25 +39,6 @@ function toPoseFrame(frame: ResolvedPoseFrame): PoseFrame {
 }
 
 describe("featureEngineering", () => {
-  it("builds a fixed 12x54 feature tensor", () => {
-    const frames = Array.from({ length: 12 }, (_, index) => normalizePoseFrame(createResolvedFrame(index)));
-    const sequence = buildFeatureSequence(frames);
-
-    expect(sequence).toHaveLength(12);
-    sequence.forEach((featureFrame) => {
-      expect(featureFrame).toHaveLength(54);
-    });
-  });
-
-  it("zero-pads velocity and acceleration for the first sequence frame", () => {
-    const sequence = buildFeatureSequence([
-      normalizePoseFrame(createResolvedFrame(0)),
-      normalizePoseFrame(createResolvedFrame(1))
-    ]);
-
-    expect(sequence[10].slice(3, 9)).toEqual([0, 0, 0, 0, 0, 0]);
-  });
-
   it("restores normalized coordinates back into the original basis", () => {
     const frame = createResolvedFrame(4);
     const basis = createBasis(frame);
@@ -67,34 +50,71 @@ describe("featureEngineering", () => {
     expect(restored.z).toBeCloseTo(frame.leftWrist.z);
   });
 
-  it("keeps short null gaps alive in the rolling buffer", () => {
-    const buffer = new PoseSequenceBuffer();
-    const resolved = createResolvedFrame(1);
-    const pushed = buffer.push(toPoseFrame(resolved));
-    const gap = buffer.push(null);
+  it("rejects incomplete pose frames instead of backfilling missing joints", () => {
+    const resolved = resolvePoseFrame({
+      timestamp: 1,
+      nose: { x: 0, y: 0, z: 0 },
+      leftShoulder: { x: -0.2, y: 0.2, z: 0 },
+      leftElbow: null,
+      leftWrist: { x: -0.3, y: 0.1, z: -0.1 },
+      rightShoulder: { x: 0.2, y: 0.2, z: 0 },
+      rightElbow: { x: 0.3, y: 0.1, z: -0.1 },
+      rightWrist: { x: 0.4, y: 0.05, z: -0.15 }
+    });
 
-    expect(pushed.tracking).toBe(true);
-    expect(gap.tracking).toBe(true);
-    expect(gap.currentPose?.leftWrist.x).toBeCloseTo(resolved.leftWrist.x);
+    expect(resolved).toBeNull();
   });
 
-  it("fills missing keypoints from the previous resolved frame", () => {
-    const previous = createResolvedFrame(2);
-    const sparseFrame: PoseFrame = {
-      timestamp: 3,
-      nose: null,
-      leftShoulder: previous.leftShoulder,
-      leftElbow: null,
-      leftWrist: null,
-      rightShoulder: previous.rightShoulder,
-      rightElbow: null,
-      rightWrist: null
-    };
+  it("keeps the first feature frame's velocity and acceleration at zero", () => {
+    const featureFrame = buildFeatureFrame([normalizePoseFrame(createResolvedFrame(0))]);
 
-    const resolved = resolvePoseFrame(sparseFrame, previous);
+    expect(featureFrame).toHaveLength(54);
+    expect(featureFrame.slice(3, 9)).toEqual([0, 0, 0, 0, 0, 0]);
+  });
 
-    expect(resolved).not.toBeNull();
-    expect(resolved?.leftWrist.x).toBeCloseTo(previous.leftWrist.x);
-    expect(resolved?.interpolated).toBe(true);
+  it("computes acceleration from the latest three normalized poses", () => {
+    const frames = [0, 1, 2].map((timestamp) => normalizePoseFrame(createResolvedFrame(timestamp)));
+    const featureFrame = buildFeatureFrame(frames);
+
+    expect(featureFrame).toHaveLength(54);
+    expect(featureFrame.slice(24, 27).some((value) => value !== 0)).toBe(true);
+  });
+
+  it("applies boxer_ai EMA smoothing after normalization", () => {
+    const previous = normalizePoseFrame(createResolvedFrame(0));
+    const current = normalizePoseFrame(createResolvedFrame(1));
+    const smoothed = smoothPoseFrame(current, previous, 0.7);
+
+    expect(smoothed.leftWrist.x).toBeCloseTo(previous.leftWrist.x * 0.7 + current.leftWrist.x * 0.3);
+  });
+
+  it("emits a ready 12-step feature window only after collecting 12 feature frames", () => {
+    const buffer = new PoseSequenceBuffer();
+    let latest = buffer.push(toPoseFrame(createResolvedFrame(0)));
+
+    expect(latest.tracking).toBe(true);
+    expect(latest.ready).toBe(false);
+
+    for (let index = 1; index < 12; index += 1) {
+      latest = buffer.push(toPoseFrame(createResolvedFrame(index)));
+    }
+
+    expect(latest.ready).toBe(true);
+    expect(latest.features).toHaveLength(12);
+    latest.features.forEach((featureFrame) => {
+      expect(featureFrame).toHaveLength(54);
+    });
+    expect(buildFeatureSequence(latest.features)).toHaveLength(12);
+  });
+
+  it("keeps tracking alive for short gaps but stops producing model input", () => {
+    const buffer = new PoseSequenceBuffer();
+    buffer.push(toPoseFrame(createResolvedFrame(0)));
+    const gap = buffer.push(null);
+
+    expect(gap.tracking).toBe(true);
+    expect(gap.ready).toBe(false);
+    expect(gap.features).toEqual([]);
+    expect(gap.currentPose).toBeNull();
   });
 });

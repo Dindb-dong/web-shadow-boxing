@@ -110,8 +110,28 @@ export interface CounterTrigger {
   target: Vec3;
 }
 
+export interface DebugHudSnapshot {
+  rawThreatLabel: string;
+  rawAttackingProbLabel: string;
+  trajectoryEmitRawProbLabel: string;
+  stableThreatLabel: string;
+  wristsVisibleLabel: string;
+  leftWristVisibilityLabel: string;
+  rightWristVisibilityLabel: string;
+  predictionGatedLabel: string;
+  combatHitboxOverlapLabel: string;
+  dodgeChanceRollLabel: string;
+  attackStartedEdgeLabel: string;
+  assessmentAgeLabel: string;
+  refreshCountLabel: string;
+  emitCountLabel: string;
+  lastEventLabel: string;
+  logLines: string[];
+}
+
 export interface HudSnapshot extends CombatSnapshot {
   trackingLabel: string;
   stateLabel: string;
   attackingProbLabel: string;
+  debug: DebugHudSnapshot;
 }
