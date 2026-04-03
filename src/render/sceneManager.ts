@@ -462,14 +462,8 @@ export class SceneManager {
     return oldest;
   }
 
-  /** Converts raw predicted wrist points into a smoother Catmull-Rom path. */
+  /** Keeps the rendered threat path identical to the collision path used by combat logic. */
   private buildSmoothedPath(wristSteps: Vec3[]): THREE.Vector3[] {
-    const controls = wristSteps.map((point) => new THREE.Vector3(point.x, point.y, point.z));
-    if (controls.length < 3) {
-      return controls;
-    }
-
-    const curve = new THREE.CatmullRomCurve3(controls, false, "centripetal", 0.35);
-    return curve.getPoints((controls.length - 1) * 2);
+    return wristSteps.map((point) => new THREE.Vector3(point.x, point.y, point.z));
   }
 }

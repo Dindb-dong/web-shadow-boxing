@@ -42,9 +42,18 @@ interface CounterResolution {
   result: GuardResult;
   reason: "hit" | "blocked" | "sway" | "missed";
 }
+
+interface CombatDebugTelemetry {
+  avatarOverlap: boolean;
+  dodgeChance: number | null;
+  dodgeRoll: number | null;
+  attackStartedEdge: boolean;
+}
 type DodgeSide = "left" | "right";
 
-const AI_FACE_HITBOX: SphereHitbox = { center: { x: 0, y: 1.78, z: -1.85 }, radius: 0.28 };
+const AI_FACE_HITBOX: SphereHitbox = { center: { x: 0, y: 1.82, z: -1.88 }, radius: 0.34 };
+const AI_TORSO_HITBOX: SphereHitbox = { center: { x: 0, y: 1.2, z: -1.96 }, radius: 0.5 };
+const AI_AVATAR_HITBOXES: SphereHitbox[] = [AI_FACE_HITBOX, AI_TORSO_HITBOX];
 
 /** Returns whether the sampled trajectory point overlaps a spherical hitbox. */
 function pointInsideSphere(point: Vec3, sphere: SphereHitbox): boolean {
@@ -77,15 +86,23 @@ function segmentIntersectsSphere(start: Vec3, end: Vec3, sphere: SphereHitbox): 
   return pointInsideSphere(nearestPoint, sphere);
 }
 
-/** Returns whether either wrist path reaches the AI face hitbox. */
-function trajectoryIntersectsFace(traj: WristPairTrajectory): boolean {
+/** Returns whether one trajectory segment intersects any avatar hitbox. */
+function segmentIntersectsAnyHitbox(start: Vec3, end: Vec3, hitboxes: SphereHitbox[]): boolean {
+  return hitboxes.some((sphere) => segmentIntersectsSphere(start, end, sphere));
+}
+
+/** Returns whether either wrist path reaches the visible AI avatar volume. */
+function trajectoryIntersectsAvatar(traj: WristPairTrajectory): boolean {
   return traj.some((wristSteps) => {
     for (let index = 0; index < wristSteps.length; index += 1) {
       const point = wristSteps[index];
-      if (pointInsideSphere(point, AI_FACE_HITBOX)) {
+      if (AI_AVATAR_HITBOXES.some((sphere) => pointInsideSphere(point, sphere))) {
         return true;
       }
-      if (index < wristSteps.length - 1 && segmentIntersectsSphere(point, wristSteps[index + 1], AI_FACE_HITBOX)) {
+      if (
+        index < wristSteps.length - 1 &&
+        segmentIntersectsAnyHitbox(point, wristSteps[index + 1], AI_AVATAR_HITBOXES)
+      ) {
         return true;
       }
     }
@@ -196,7 +213,6 @@ export class CombatSystem {
   private guardedCounters = 0;
   private lastUpdateTime: number | null = null;
   private threatExpiresAt: number | null = null;
-  private aiHitCooldownUntil: number | null = null;
   private counterLaunchAt: number | null = null;
   private counterResolveAt: number | null = null;
   private counterTarget: Vec3 | null = null;
@@ -224,6 +240,7 @@ export class CombatSystem {
     snapshot: CombatSnapshot;
     triggerDodge: DodgeType | null;
     triggerCounter: CounterTrigger | null;
+    debug: CombatDebugTelemetry;
   } {
     const { now, modelMode, tracking, output, worldTraj, userPose } = params;
     if (this.lastUpdateTime !== null) {
@@ -234,6 +251,12 @@ export class CombatSystem {
 
     let triggerDodge: DodgeType | null = null;
     let triggerCounter: CounterTrigger | null = null;
+    let debug: CombatDebugTelemetry = {
+      avatarOverlap: false,
+      dodgeChance: null,
+      dodgeRoll: null,
+      attackStartedEdge: false
+    };
 
     if (!tracking || !output || !worldTraj) {
       this.statusText = tracking ? "Collecting model-ready frames" : "Tracking lost";
@@ -245,16 +268,23 @@ export class CombatSystem {
       return {
         snapshot: this.createSnapshot(modelMode, tracking),
         triggerDodge,
-        triggerCounter
+        triggerCounter,
+        debug
       };
     }
 
     this.threatStateName = output.state_name;
     this.threatProbability = output.attacking_prob;
     const threatening = isThreateningOutput(output, THREAT_PROBABILITY_THRESHOLD);
-    const faceThreat = threatening && trajectoryIntersectsFace(worldTraj);
+    const avatarThreat = threatening && trajectoryIntersectsAvatar(worldTraj);
     const attackStarted = threatening && !this.attackActive;
     const vulnerableToPunish = this.counterState === "primed" && this.counterLaunchAt !== null;
+    debug = {
+      avatarOverlap: avatarThreat,
+      dodgeChance: null,
+      dodgeRoll: null,
+      attackStartedEdge: attackStarted
+    };
 
     if (threatening) {
       this.threatExpiresAt = now + DODGE_DURATION_MS;
@@ -267,43 +297,46 @@ export class CombatSystem {
       this.attackResolved = false;
     }
 
-    if (threatening && !this.attackResolved && vulnerableToPunish && faceThreat) {
-      this.applyAiHit(now, AI_COUNTER_VULNERABLE_HIT_DAMAGE);
+    if (attackStarted && threatening && !this.attackResolved && vulnerableToPunish && avatarThreat) {
+      this.applyAiHit(AI_COUNTER_VULNERABLE_HIT_DAMAGE);
       this.cancelCounter();
       this.attackResolved = true;
       this.statusText = this.aiHp > 0 ? "You punished the AI during its counter" : "AI is down";
-    } else if (attackStarted && this.counterState === "idle" && this.dodgeType === null) {
-      const dodgeChance = computeDodgeChance(this.aiStamina, output.attacking_prob);
-      const canDodge = this.aiStamina >= AI_STAMINA_DODGE_COST && this.random() <= dodgeChance;
+    } else if (attackStarted && !this.attackResolved && avatarThreat) {
+      if (this.counterState === "idle" && this.dodgeType === null) {
+        const dodgeChance = computeDodgeChance(this.aiStamina, output.attacking_prob);
+        const dodgeRoll = this.random();
+        const canDodge = this.aiStamina >= AI_STAMINA_DODGE_COST && dodgeRoll <= dodgeChance;
+        debug.dodgeChance = dodgeChance;
+        debug.dodgeRoll = dodgeRoll;
 
-      if (canDodge) {
-        this.aiStamina -= AI_STAMINA_DODGE_COST;
-        this.dodgeType = chooseDodgeType(worldTraj, this.random, this.lastDodgeSide);
-        this.lastDodgeSide = this.dodgeType.startsWith("left") ? "left" : "right";
-        this.counterMove = chooseCounterMove(this.dodgeType, this.counterIndex);
-        this.counterIndex += 1;
-        this.counterLaunchAt = now + COUNTER_LAUNCH_DELAY_MS;
-        this.counterResolveAt = now + COUNTER_LAUNCH_DELAY_MS + COUNTER_RESOLVE_DELAY_MS;
-        this.counterTarget = resolveCounterTarget(userPose);
-        this.counterState = "primed";
-        this.lastGuardResult = "none";
-        this.attackResolved = true;
-        this.statusText = `AI ${this.dodgeType.replace("_", " ")} dodged and is loading a counter`;
-        triggerDodge = this.dodgeType;
-      } else if (faceThreat) {
-        this.applyAiHit(now, AI_HIT_DAMAGE);
-        this.attackResolved = true;
-        this.statusText = this.aiHp > 0 ? "Your punch landed on the AI face" : "AI is down";
+        if (canDodge) {
+          this.aiStamina -= AI_STAMINA_DODGE_COST;
+          this.dodgeType = chooseDodgeType(worldTraj, this.random, this.lastDodgeSide);
+          this.lastDodgeSide = this.dodgeType.startsWith("left") ? "left" : "right";
+          this.counterMove = chooseCounterMove(this.dodgeType, this.counterIndex);
+          this.counterIndex += 1;
+          this.counterLaunchAt = now + COUNTER_LAUNCH_DELAY_MS;
+          this.counterResolveAt = now + COUNTER_LAUNCH_DELAY_MS + COUNTER_RESOLVE_DELAY_MS;
+          this.counterTarget = resolveCounterTarget(userPose);
+          this.counterState = "primed";
+          this.lastGuardResult = "none";
+          this.attackResolved = true;
+          this.statusText = `AI ${this.dodgeType.replace("_", " ")} dodged and is loading a counter`;
+          triggerDodge = this.dodgeType;
+        } else {
+          this.applyAiHit(AI_HIT_DAMAGE);
+          this.attackResolved = true;
+          this.statusText = this.aiHp > 0 ? "Your punch landed on the AI" : "AI is down";
+        }
       } else {
-        this.statusText = "Threat detected";
+        this.applyAiHit(AI_HIT_DAMAGE);
+        this.attackResolved = true;
+        this.statusText = this.aiHp > 0 ? "Your punch caught the AI mid-motion" : "AI is down";
       }
-    } else if (threatening && !this.attackResolved && this.counterState === "idle" && this.dodgeType === null && faceThreat) {
-      this.applyAiHit(now, AI_HIT_DAMAGE);
-      this.attackResolved = true;
-      this.statusText = this.aiHp > 0 ? "Your punch landed on the AI face" : "AI is down";
     } else if (threatening && this.counterState === "primed") {
       this.statusText = this.counterLaunchAt !== null ? "AI counter is locked on your last head position" : "AI counter is in motion";
-    } else if (faceThreat && this.dodgeType !== null) {
+    } else if (avatarThreat && this.dodgeType !== null) {
       this.statusText = `AI ${this.dodgeType.replace("_", " ")} is slipping the punch`;
     } else if (threatening) {
       this.statusText = "Threat detected";
@@ -353,7 +386,8 @@ export class CombatSystem {
     return {
       snapshot: this.createSnapshot(modelMode, tracking),
       triggerDodge,
-      triggerCounter
+      triggerCounter,
+      debug
     };
   }
 
@@ -381,15 +415,10 @@ export class CombatSystem {
     };
   }
 
-  /** Applies damage to the AI while respecting the short repeated-hit cooldown. */
-  private applyAiHit(now: number, damage: number): void {
-    if (this.aiHitCooldownUntil !== null && now < this.aiHitCooldownUntil) {
-      return;
-    }
-
+  /** Applies one confirmed hit to the AI. */
+  private applyAiHit(damage: number): void {
     this.aiHp = Math.max(this.aiHp - damage, 0);
     this.successfulHits += 1;
-    this.aiHitCooldownUntil = now + DODGE_DURATION_MS;
     this.lastGuardResult = "none";
   }
 

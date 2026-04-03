@@ -342,7 +342,7 @@ describe("combatSystem", () => {
     expect(punish.snapshot.counterState).toBe("idle");
   });
 
-  it("ignores threatening trajectories that miss the AI face", () => {
+  it("applies damage when the trajectory intersects the visible AI torso even if it misses the face", () => {
     const system = new CombatSystem(() => 0.99);
     const result = system.update({
       now: 100,
@@ -354,8 +354,8 @@ describe("combatSystem", () => {
     });
 
     expect(result.triggerDodge).toBeNull();
-    expect(result.snapshot.aiHp).toBe(100);
-    expect(result.snapshot.successfulHits).toBe(0);
+    expect(result.snapshot.aiHp).toBe(86);
+    expect(result.snapshot.successfulHits).toBe(1);
   });
 
   it("applies AI damage when a trajectory segment crosses the face hitbox between sampled points", () => {
