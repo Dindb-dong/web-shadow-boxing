@@ -135,16 +135,58 @@ function createGuardPose(guarding: boolean): ResolvedPoseFrame {
   };
 }
 
-function createShiftedBlockPose(): ResolvedPoseFrame {
+function createTightGuardDefensePose(): ResolvedPoseFrame {
   return {
     timestamp: 2,
-    nose: { x: 0.2, y: 0.3, z: 0 },
-    leftShoulder: { x: -0.1, y: 0.2, z: 0 },
-    leftElbow: { x: -0.04, y: 0.24, z: 0 },
-    leftWrist: { x: 0.02, y: 0.3, z: 0 },
-    rightShoulder: { x: 0.28, y: 0.2, z: 0 },
-    rightElbow: { x: 0.3, y: 0.08, z: 0 },
+    nose: { x: 0, y: 0.3, z: 0.08 },
+    leftShoulder: { x: -0.2, y: 0.2, z: 0.02 },
+    leftElbow: { x: -0.16, y: 0.12, z: 0.03 },
+    leftWrist: { x: 0.04, y: 0.3, z: 0.04 },
+    rightShoulder: { x: 0.2, y: 0.2, z: 0.02 },
+    rightElbow: { x: 0.16, y: 0.12, z: 0.03 },
+    rightWrist: { x: -0.03, y: 0.29, z: 0.04 },
+    interpolated: false
+  };
+}
+
+function createLooseHandNearTargetPose(): ResolvedPoseFrame {
+  return {
+    timestamp: 2,
+    nose: { x: 0.07, y: 0.3, z: 0 },
+    leftShoulder: { x: -0.2, y: 0.2, z: 0 },
+    leftElbow: { x: -0.12, y: 0.18, z: 0 },
+    leftWrist: { x: 0, y: 0.3, z: 0 },
+    rightShoulder: { x: 0.2, y: 0.2, z: 0 },
+    rightElbow: { x: 0.25, y: 0.08, z: 0 },
     rightWrist: { x: 0.42, y: -0.08, z: 0.1 },
+    interpolated: false
+  };
+}
+
+function createDuckDefensePose(): ResolvedPoseFrame {
+  return {
+    timestamp: 2,
+    nose: { x: 0, y: 0.16, z: 0 },
+    leftShoulder: { x: -0.2, y: 0.14, z: 0 },
+    leftElbow: { x: -0.28, y: 0.04, z: 0 },
+    leftWrist: { x: -0.36, y: -0.08, z: 0.04 },
+    rightShoulder: { x: 0.2, y: 0.14, z: 0 },
+    rightElbow: { x: 0.28, y: 0.04, z: 0 },
+    rightWrist: { x: 0.36, y: -0.08, z: 0.04 },
+    interpolated: false
+  };
+}
+
+function createWeaveDefensePose(): ResolvedPoseFrame {
+  return {
+    timestamp: 2,
+    nose: { x: 0.11, y: 0.3, z: 0 },
+    leftShoulder: { x: -0.12, y: 0.2, z: 0 },
+    leftElbow: { x: -0.22, y: 0.1, z: 0 },
+    leftWrist: { x: -0.32, y: -0.04, z: 0.05 },
+    rightShoulder: { x: 0.28, y: 0.2, z: 0 },
+    rightElbow: { x: 0.34, y: 0.08, z: 0 },
+    rightWrist: { x: 0.44, y: -0.08, z: 0.06 },
     interpolated: false
   };
 }
@@ -203,6 +245,7 @@ describe("combatSystem", () => {
     expect(launched.triggerCounter?.target?.x).toBeCloseTo(0);
     expect(launched.triggerCounter?.target?.y).toBeCloseTo(2.08);
     expect(launched.triggerCounter?.target?.z).toBeCloseTo(-0.8);
+    expect(first.snapshot.aiStamina).toBe(96);
     expect(resolved.triggerCounter).toBeNull();
     expect(resolved.snapshot.playerHp).toBe(88);
     expect(resolved.snapshot.lastGuardResult).toBe("hit");
@@ -285,7 +328,7 @@ describe("combatSystem", () => {
     expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.31);
   });
 
-  it("blocks a counter with the arm when the face moved off the target line", () => {
+  it("counts only a tight wrist guard near the nose as a blocked counter", () => {
     const system = new CombatSystem(() => 0);
     const output = createOutput("attacking", 0.9);
     const first = system.update({
@@ -310,7 +353,7 @@ describe("combatSystem", () => {
       tracking: true,
       output,
       worldTraj: createFaceThreatTrajectory(),
-      userPose: createShiftedBlockPose()
+      userPose: createTightGuardDefensePose()
     });
 
     expect(first.triggerDodge).not.toBeNull();
@@ -319,6 +362,108 @@ describe("combatSystem", () => {
     expect(result.snapshot.guardedCounters).toBe(1);
     expect(result.snapshot.playerHp).toBe(100);
     expect(result.snapshot.statusText).toContain("blocked");
+  });
+
+  it("does not count a loose hand near the target as a defended counter", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+
+    system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    system.update({
+      now: 450,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    const result = system.update({
+      now: 950,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createLooseHandNearTargetPose()
+    });
+
+    expect(result.snapshot.guardedCounters).toBe(0);
+    expect(result.snapshot.playerHp).toBe(88);
+    expect(result.snapshot.statusText).toContain("found your face");
+  });
+
+  it("treats a real duck as a defended counter", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+
+    system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    system.update({
+      now: 450,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    const result = system.update({
+      now: 950,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createDuckDefensePose()
+    });
+
+    expect(result.snapshot.guardedCounters).toBe(1);
+    expect(result.snapshot.playerHp).toBe(100);
+    expect(result.snapshot.statusText).toContain("ducked");
+  });
+
+  it("treats a real weave off line as a defended counter", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+
+    system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    system.update({
+      now: 450,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    const result = system.update({
+      now: 950,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createWeaveDefensePose()
+    });
+
+    expect(result.snapshot.guardedCounters).toBe(1);
+    expect(result.snapshot.playerHp).toBe(100);
+    expect(result.snapshot.statusText).toContain("weaved");
   });
 
   it("treats a sway-back movement as a defended counter", () => {

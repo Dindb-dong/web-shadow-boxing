@@ -6,10 +6,13 @@ import {
   AI_STAMINA_MAX,
   AI_STAMINA_RECOVERY_PER_SEC,
   COUNTER_BLOCK_DISTANCE_THRESHOLD,
+  COUNTER_DUCK_Y_THRESHOLD,
   COUNTER_FACE_HIT_THRESHOLD,
   COUNTER_LAUNCH_DELAY_MS,
   COUNTER_RESOLVE_DELAY_MS,
   COUNTER_SWAY_Z_THRESHOLD,
+  COUNTER_TIGHT_GUARD_WRIST_TO_NOSE_THRESHOLD,
+  COUNTER_WEAVE_X_THRESHOLD,
   DODGE_DURATION_MS,
   PLAYER_HP_MAX,
   THREAT_PROBABILITY_THRESHOLD
@@ -44,7 +47,7 @@ interface CircleHitbox {
 
 interface CounterResolution {
   result: GuardResult;
-  reason: "hit" | "blocked" | "sway" | "missed";
+  reason: "hit" | "blocked" | "duck" | "weave" | "sway" | "missed";
 }
 
 interface CombatDebugTelemetry {
@@ -119,6 +122,11 @@ function resolveCounterTarget(pose: ResolvedPoseFrame | null): Vec3 | null {
   return pose ? mapBodyPointToWorld(pose.nose) : null;
 }
 
+/** Returns wrist world points only, because loose elbows/shoulders should not count as counter defense. */
+function resolveWristWorldPoints(pose: ResolvedPoseFrame): Vec3[] {
+  return [pose.leftWrist, pose.rightWrist].map((point) => mapBodyPointToWorld(point));
+}
+
 /** Chooses a dodge side from threat position and lateral wrist travel. */
 function chooseDodgeSide(traj: WristPairTrajectory, random: () => number, previousSide: DodgeSide | null): DodgeSide {
   const flat = traj.flat();
@@ -169,6 +177,7 @@ function resolveCounterResult(pose: ResolvedPoseFrame | null, target: Vec3 | nul
   }
 
   const noseWorld = mapBodyPointToWorld(pose.nose);
+  const wristWorldPoints = resolveWristWorldPoints(pose);
   if (distanceVec3(noseWorld, target) <= COUNTER_FACE_HIT_THRESHOLD) {
     return { result: "hit", reason: "hit" };
   }
@@ -177,16 +186,21 @@ function resolveCounterResult(pose: ResolvedPoseFrame | null, target: Vec3 | nul
     return { result: "guarded", reason: "sway" };
   }
 
-  const defensePoints = [
-    pose.leftWrist,
-    pose.rightWrist,
-    pose.leftElbow,
-    pose.rightElbow,
-    pose.leftShoulder,
-    pose.rightShoulder
-  ].map((point) => mapBodyPointToWorld(point));
+  if (noseWorld.y <= target.y - COUNTER_DUCK_Y_THRESHOLD) {
+    return { result: "guarded", reason: "duck" };
+  }
 
-  if (defensePoints.some((point) => distanceVec3(point, target) <= COUNTER_BLOCK_DISTANCE_THRESHOLD)) {
+  if (Math.abs(noseWorld.x - target.x) >= COUNTER_WEAVE_X_THRESHOLD) {
+    return { result: "guarded", reason: "weave" };
+  }
+
+  const tightGuard = wristWorldPoints.some(
+    (point) =>
+      distanceVec3(point, target) <= COUNTER_BLOCK_DISTANCE_THRESHOLD &&
+      distanceVec3(point, noseWorld) <= COUNTER_TIGHT_GUARD_WRIST_TO_NOSE_THRESHOLD
+  );
+
+  if (tightGuard) {
     return { result: "guarded", reason: "blocked" };
   }
 
@@ -390,12 +404,18 @@ export class CombatSystem {
         this.statusText = `${this.counterMove?.replace("_", " ") ?? "counter"} found your face`;
       } else {
         this.guardedCounters += 1;
-        this.statusText =
-          resolution.reason === "blocked"
-            ? `${this.counterMove?.replace("_", " ") ?? "counter"} was blocked by your arms`
-            : resolution.reason === "sway"
-              ? `${this.counterMove?.replace("_", " ") ?? "counter"} missed as you slipped back`
-              : `${this.counterMove?.replace("_", " ") ?? "counter"} missed off line`;
+        const counterLabel = this.counterMove?.replace("_", " ") ?? "counter";
+        if (resolution.reason === "blocked") {
+          this.statusText = `${counterLabel} was blocked by a tight guard`;
+        } else if (resolution.reason === "duck") {
+          this.statusText = `${counterLabel} missed as you ducked under it`;
+        } else if (resolution.reason === "weave") {
+          this.statusText = `${counterLabel} missed as you weaved off line`;
+        } else if (resolution.reason === "sway") {
+          this.statusText = `${counterLabel} missed as you slipped back`;
+        } else {
+          this.statusText = `${counterLabel} missed off line`;
+        }
       }
     }
 
