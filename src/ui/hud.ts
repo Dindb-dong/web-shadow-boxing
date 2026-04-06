@@ -16,6 +16,9 @@ export class HudController {
       trackingValue: HTMLSpanElement;
       stateValue: HTMLSpanElement;
       probabilityValue: HTMLSpanElement;
+      liveThreatPanel: HTMLDivElement;
+      liveStateValue: HTMLSpanElement;
+      liveProbabilityValue: HTMLSpanElement;
       modelValue: HTMLSpanElement;
       statusValue: HTMLParagraphElement;
       playerHpBar: HTMLDivElement;
@@ -53,6 +56,9 @@ export class HudController {
     this.refs.trackingValue.textContent = snapshot.trackingLabel;
     this.refs.stateValue.textContent = snapshot.stateLabel;
     this.refs.probabilityValue.textContent = snapshot.attackingProbLabel;
+    this.refs.liveThreatPanel.dataset.threat = snapshot.stateLabel;
+    this.refs.liveStateValue.textContent = snapshot.stateLabel.toUpperCase();
+    this.refs.liveProbabilityValue.textContent = `${Math.round(clamp(snapshot.activeThreat.attackingProb, 0, 1) * 100)}%`;
     this.refs.modelValue.textContent = snapshot.modelMode;
     this.refs.statusValue.textContent = snapshot.counterMove
       ? `${snapshot.statusText} • ${snapshot.counterMove.replace("_", " ")}`
