@@ -64,7 +64,42 @@ describe("worldMapping", () => {
     );
 
     expect(Math.abs(world[0][0].x)).toBeGreaterThan(1.5);
-    expect(Math.abs(world[0][5].x)).toBeGreaterThan(0.35);
+    expect(Math.abs(world[0][5].x)).toBeGreaterThan(0.22);
     expect(Math.abs(world[0][5].x)).toBeLessThan(Math.abs(world[0][0].x));
+  });
+
+  it("reshapes wide arcs for both hands so they start near the side lane and finish nearer center", () => {
+    const world = trajectoryToWorld(
+      [
+        [
+          { x: -0.7, y: 0.06, z: -0.24 },
+          { x: -0.64, y: 0.08, z: -0.33 },
+          { x: -0.56, y: 0.09, z: -0.43 },
+          { x: -0.46, y: 0.1, z: -0.53 },
+          { x: -0.36, y: 0.11, z: -0.61 },
+          { x: -0.26, y: 0.13, z: -0.69 }
+        ],
+        [
+          { x: 0.7, y: 0.04, z: -0.24 },
+          { x: 0.64, y: 0.06, z: -0.33 },
+          { x: 0.56, y: 0.08, z: -0.43 },
+          { x: 0.46, y: 0.09, z: -0.53 },
+          { x: 0.36, y: 0.1, z: -0.61 },
+          { x: 0.26, y: 0.11, z: -0.69 }
+        ]
+      ],
+      {
+        shoulderCenter: { x: 0, y: 0, z: 0 },
+        shoulderScale: 1
+      }
+    );
+
+    expect(world[0][0].x).toBeGreaterThan(2);
+    expect(world[0][5].x).toBeGreaterThan(0.18);
+    expect(world[0][5].x).toBeLessThan(0.3);
+
+    expect(world[1][0].x).toBeLessThan(-2);
+    expect(world[1][5].x).toBeLessThan(-0.18);
+    expect(world[1][5].x).toBeGreaterThan(-0.3);
   });
 });

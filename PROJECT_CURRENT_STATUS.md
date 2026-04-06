@@ -49,7 +49,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. 동시에 imported humanoid skeleton의 `Shoulder -> Upper Arm -> Lower Arm -> Hand` 체인을 직접 풀어 기본 가드 자세와 counter 펀치 연결감을 유지한다. dodge 중에는 이동 방향 반대쪽 어깨가 리드되도록 별도 torso yaw/roll을 적용한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 idle/counter 모두에서 hand bone 위치에 동기화되며, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.13`으로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.14`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
@@ -82,6 +82,9 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 후속 모델 갱신에서는 exporter가 외부 절대경로가 아니라 로컬 `checkpoints/gru_model.pt`를 읽도록 바꿨고, 팀원이 전달한 새 `.pt` 체크포인트를 브라우저용 `src/model/assets/boxerAiWeights.json`으로 다시 export했다. 현재 버전 표기는 `1.3.11`이다.
 - 이번 후속 추론 튜닝에서는 팀원이 전달한 운영 가이드에 맞춰 pose EMA beta를 `0.3`으로 낮추고, 공격/trajectory emit 임계치를 `attacking_prob >= 0.3`으로 통일했다. 동시에 AI 회피 판정은 3D depth 일치보다 예측된 1~6 step 손목 궤적의 `XY` 폴리라인 전체가 아바타 실루엣을 지나는지 기준으로 바꿨고, 이에 대한 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.12`이다.
 - 이번 후속 전투 상태머신 수정에서는 낮아진 공격 임계치 때문에 predictor 출력이 연속 `attacking`으로 유지될 때 AI가 첫 회피 이후 `dodgeType/counterState=resolved/attackActive`에 묶여 다시 회피하지 못하던 버그를 고쳤다. 이제 한 펀치 윈도우가 끝나면 같은 threatening 스트림 안에서도 상태를 재무장해 다음 펀치를 새 공격으로 다시 처리하고, 이 케이스를 고정하는 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.13`이다.
+- 이번 후속 밸런스/방어 판정 수정에서는 AI dodge 스태미나 소모를 `18 -> 4`로 낮춰 연속 회피 여력을 크게 늘렸다. 동시에 AI counter 방어 판정은 느슨한 팔/어깨 proximity를 제거하고, `proper sway`, `충분한 duck`, `충분한 weave`, 또는 `코 바로 앞 tight wrist guard`만 defended로 인정하도록 조였다. 이에 따라 대충 손을 target 근처에 두는 정도로는 guarded 처리되지 않고, strict counter-defense 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.14`이다.
+- 이번 후속 trajectory 보정에서는 팀원이 준 GRU raw traj는 그대로 두고 `trajectoryToWorld()`에서 wide arc를 후처리했다. 양손 공통으로 wide hook 성격이 감지되면 초반 step의 x를 화면 측면 lane 쪽으로 넓히고, 말단 step은 다시 중앙 lane 쪽으로 당겨 `화면 끝 -> 중앙`으로 들어오는 궤적이 되도록 조정했다. 좌/우 대칭 회귀 테스트를 추가했고, 이후 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
+- 이번 후속 trajectory 렌더 정리에서는 predictor의 `left/right wrist pair`는 combat 판정에 그대로 유지하되, 화면 trail은 더 공격적인 손목 path 하나만 선택해서 그리도록 바꿨다. 덕분에 한 펀치에 붉은 궤도가 두 줄 동시에 뜨지 않고, 실제로 더 많이 전진한 손 하나만 시각화된다. 이 변경 후에도 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
 
 ## Current Limitations
 

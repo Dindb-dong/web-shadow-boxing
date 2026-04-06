@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DODGE_DURATION_MS, TRAJECTORY_DISPLAY_MS } from "../game/constants";
-import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory } from "../types/game";
+import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory, WristTrajectory } from "../types/game";
 
 const COUNTER_ANIMATION_MS = 460;
 const VICTORY_ANIMATION_MS = 1100;
@@ -110,6 +110,29 @@ function easeInOutSine(value: number): number {
 /** Clamps a normalized interpolation value into the safe 0-1 range. */
 function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1);
+}
+
+/** Scores one wrist path so rendering can prefer the hand that actually threw the punch. */
+function scoreThreatPath(path: WristTrajectory): number {
+  let pathLength = 0;
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const start = path[index];
+    const end = path[index + 1];
+    pathLength += Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
+  }
+
+  const start = path[0];
+  const end = path[path.length - 1];
+  const displacement = Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
+  const faceProgress = Math.max(0, start.z - end.z);
+
+  return pathLength * 1.1 + displacement * 0.9 + faceProgress * 0.7;
+}
+
+/** Chooses the single wrist path that should be visualized for the current punch. */
+export function resolveRenderableThreatPath(traj: WristPairTrajectory): WristTrajectory {
+  const [leftPath, rightPath] = traj;
+  return scoreThreatPath(leftPath) >= scoreThreatPath(rightPath) ? leftPath : rightPath;
 }
 
 /** Converts a dodge type to a signed lateral direction. */
@@ -718,11 +741,10 @@ export class SceneManager {
       return;
     }
 
-    for (const wristSteps of traj) {
-      const smoothedPath = this.buildSmoothedPath(wristSteps);
-      for (let index = 0; index < smoothedPath.length - 1; index += 1) {
-        this.activateThreatSegment(smoothedPath[index], smoothedPath[index + 1], now + TRAJECTORY_DISPLAY_MS);
-      }
+    const wristSteps = resolveRenderableThreatPath(traj);
+    const smoothedPath = this.buildSmoothedPath(wristSteps);
+    for (let index = 0; index < smoothedPath.length - 1; index += 1) {
+      this.activateThreatSegment(smoothedPath[index], smoothedPath[index + 1], now + TRAJECTORY_DISPLAY_MS);
     }
   }
 
