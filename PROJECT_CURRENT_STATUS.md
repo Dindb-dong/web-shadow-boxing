@@ -19,7 +19,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 9. AI는 임시 캡슐 지오메트리 대신 로컬 `public/assets/characters3d.com - Titan Boxer.glb` 리깅된 복서 GLB 아바타를 로드하며, 카메라와 모델 위치를 조정해 골반 위 중심의 스파링 상대처럼 보이도록 연출한다.
 10. AI는 기본적으로 헤드 무브먼트와 가드 자세를 유지하고, 유저 공격이 시작돼 `avatarThreat`가 성립하면 stamina가 남아 있는 한 랜덤 없이 즉시 회피를 시도한다. 회피 좌우는 `궤적 중심 위치 + 횡방향 이동량` 신호를 섞어 확률적으로 고르고, 신호가 중립인 상황이 반복되면 이전과 반대 방향을 우선해 한쪽으로만 피하는 편향을 줄였다.
 11. 회피에 성공한 경우에만 방향과 회피 종류에 맞는 정형화된 카운터 조합을 준비한다. 예를 들면 같은 방향 훅/어퍼 또는 반대손 스트레이트가 교대로 나온다.
-12. counter는 회피 직후 바로 적중 판정을 내는 것이 아니라, 회피 시점의 유저 얼굴 월드 좌표를 저장한 뒤 `0.3초 후`에 먼저 발사한다.
+12. counter는 회피와 동시에 유저 얼굴의 당시 월드 좌표를 저장하고, 같은 tick에서 즉시 발사된다.
 13. counter 발사 `0.5초 후`에 유저가 그 목표 좌표에 남았는지(피격), 손/팔로 막았는지(block), z축 뒤로 빠졌는지(sway)를 판정한다.
 14. counter 방어 판정은 이제 느슨한 팔/어깨 proximity 대신 `코 바로 앞 tight wrist guard`, `충분한 duck`, `충분한 weave`, 또는 `충분한 sway back`만 인정한다. 이 네 방식은 모두 `Defended Counters`로 집계되고, 그렇지 않으면 얼굴 피격으로 처리된다.
 15. AI HP는 유저 주먹 예측 궤도가 AI `avatar hitbox`에 닿고, 그 공격에서 dodge에 실패했거나 dodge 분기로 들어가지 못했을 때 감소한다. 예전 `face-only overlap` 의존은 제거했다. HP가 `0`이 되면 추가 회피/카운터 진입 없이 즉시 `Victory. AI is down` 상태로 고정된다.
@@ -82,6 +82,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 후속 모델 갱신에서는 exporter가 외부 절대경로가 아니라 로컬 `checkpoints/gru_model.pt`를 읽도록 바꿨고, 팀원이 전달한 새 `.pt` 체크포인트를 브라우저용 `src/model/assets/boxerAiWeights.json`으로 다시 export했다. 현재 버전 표기는 `1.3.11`이다.
 - 이번 후속 추론 튜닝에서는 팀원이 전달한 운영 가이드에 맞춰 pose EMA beta를 `0.3`으로 낮추고, 공격/trajectory emit 임계치를 운영상 `attacking_prob >= 0.5`로 올려 정적 자세나 가벼운 흔들림에서 `attacking` 오탐이 덜 뜨도록 조정했다. 동시에 AI 회피 판정은 3D depth 일치보다 예측된 1~6 step 손목 궤적의 `XY` 폴리라인 전체가 아바타 실루엣을 지나는지 기준으로 바꿨고, 이에 대한 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.12`이다.
 - 이번 추가 입력 안정화 조정에서는 pose EMA beta를 다시 `0.3 -> 0.5`로 올려, 프레임별 미세 떨림보다 직전 포즈 관성을 더 강하게 반영하도록 바꿨다. 이에 맞춰 feature-engineering 회귀 테스트도 기본 스무딩값 기준으로 갱신했다. 이 변경 후 `docker compose run --rm app npm run test:run -- tests/pose/featureEngineering.test.ts`, `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
+- 이번 추가 카운터 템포 조정에서는 회피 성공 후 반격 launch 지연을 `0.3초 -> 0초`로 낮춰, AI가 피하자마자 곧바로 주먹을 내도록 바꿨다. 적중/방어 해석은 여전히 launch 후 `0.5초` 시점에 처리해, 반격은 즉각적이되 방어 판정 타이밍은 유지했다. 이 변경 후 `docker compose run --rm app npm run test:run -- tests/game/combatSystem.test.ts`, `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
 - 이번 후속 전투 상태머신 수정에서는 낮아진 공격 임계치 때문에 predictor 출력이 연속 `attacking`으로 유지될 때 AI가 첫 회피 이후 `dodgeType/counterState=resolved/attackActive`에 묶여 다시 회피하지 못하던 버그를 고쳤다. 이제 한 펀치 윈도우가 끝나면 같은 threatening 스트림 안에서도 상태를 재무장해 다음 펀치를 새 공격으로 다시 처리하고, 이 케이스를 고정하는 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.13`이다.
 - 이번 후속 밸런스/방어 판정 수정에서는 AI dodge 스태미나 소모를 `18 -> 4`로 낮춰 연속 회피 여력을 크게 늘렸다. 동시에 AI counter 방어 판정은 느슨한 팔/어깨 proximity를 제거하고, `proper sway`, `충분한 duck`, `충분한 weave`, 또는 `코 바로 앞 tight wrist guard`만 defended로 인정하도록 조였다. 이에 따라 대충 손을 target 근처에 두는 정도로는 guarded 처리되지 않고, strict counter-defense 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.14`이다.
 - 이번 후속 trajectory 보정에서는 팀원이 준 GRU raw traj는 그대로 두고 `trajectoryToWorld()`에서 wide arc를 후처리했다. 양손 공통으로 wide hook 성격이 감지되면 초반 step의 x를 화면 측면 lane 쪽으로 넓히고, 말단 step은 다시 중앙 lane 쪽으로 당겨 `화면 끝 -> 중앙`으로 들어오는 궤적이 되도록 조정했다. 좌/우 대칭 회귀 테스트를 추가했고, 이후 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
