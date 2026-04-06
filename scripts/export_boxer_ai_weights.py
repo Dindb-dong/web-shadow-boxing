@@ -18,7 +18,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CHECKPOINT_PATH = Path("/Users/maxkim/boxer_ai/checkpoints/20260331_004346/gru_model.pt")
+CHECKPOINT_PATH = REPO_ROOT / "checkpoints" / "gru_model.pt"
 OUTPUT_PATH = REPO_ROOT / "src" / "model" / "assets" / "boxerAiWeights.json"
 
 
