@@ -48,7 +48,7 @@ interface CircleHitbox {
 
 interface CounterResolution {
   result: GuardResult;
-  reason: "hit" | "blocked" | "duck" | "weave" | "sway" | "missed";
+  reason: "hit" | "blocked" | "duck" | "weave" | "sway";
 }
 
 function mapCounterReasonToDefense(reason: CounterResolution["reason"]): CounterDefenseType {
@@ -61,7 +61,7 @@ function mapCounterReasonToDefense(reason: CounterResolution["reason"]): Counter
   if (reason === "duck" || reason === "weave" || reason === "sway") {
     return reason;
   }
-  return "off_line";
+  return "tight_guard";
 }
 
 interface CombatDebugTelemetry {
@@ -187,7 +187,7 @@ function chooseCounterMove(dodgeType: DodgeType, counterIndex: number): CounterM
 /** Resolves whether the AI counter found the user's face or was defended. */
 function resolveCounterResult(pose: ResolvedPoseFrame | null, target: Vec3 | null): CounterResolution {
   if (!pose || !target) {
-    return { result: "guarded", reason: "missed" };
+    return { result: "hit", reason: "hit" };
   }
 
   const noseWorld = mapBodyPointToWorld(pose.nose);
@@ -218,7 +218,7 @@ function resolveCounterResult(pose: ResolvedPoseFrame | null, target: Vec3 | nul
     return { result: "guarded", reason: "blocked" };
   }
 
-  return { result: "guarded", reason: "missed" };
+  return { result: "hit", reason: "hit" };
 }
 
 /** Encapsulates dodge, stamina, counter, and guard state transitions. */
@@ -445,8 +445,6 @@ export class CombatSystem {
           this.statusText = `${counterLabel} missed as you weaved off line`;
         } else if (resolution.reason === "sway") {
           this.statusText = `${counterLabel} missed as you slipped back`;
-        } else {
-          this.statusText = `${counterLabel} missed off line`;
         }
       }
     }

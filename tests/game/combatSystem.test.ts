@@ -533,6 +533,45 @@ describe("combatSystem", () => {
     expect(result.snapshot.statusText).toContain("slipped back");
   });
 
+  it("treats missing pose data as a hit instead of a fifth defense type", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+
+    system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    system.update({
+      now: 450,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    const result = system.update({
+      now: 950,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: null
+    });
+
+    expect(result.snapshot.guardedCounters).toBe(0);
+    expect(result.snapshot.playerHp).toBe(88);
+    expect(result.snapshot.lastCounterDefense).toBe("hit");
+    expect(result.snapshot.counterDefenseStats.tightGuard).toBe(0);
+    expect(result.snapshot.counterDefenseStats.duck).toBe(0);
+    expect(result.snapshot.counterDefenseStats.weave).toBe(0);
+    expect(result.snapshot.counterDefenseStats.sway).toBe(0);
+    expect(result.snapshot.statusText).toContain("found your face");
+  });
+
   it("does not reduce AI hp when the face trajectory is dodged", () => {
     const system = new CombatSystem(() => 0);
     const result = system.update({
