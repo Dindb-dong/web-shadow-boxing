@@ -42,27 +42,31 @@ export class PoseTracker {
   private samplingTimer: number | null = null;
   private disposed = false;
 
+  /** Returns currently available browser video input devices. */
+  async getVideoInputDevices(): Promise<MediaDeviceInfo[]> {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      return [];
+    }
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((device) => device.kind === "videoinput");
+  }
+
+  /** Returns the active stream's current video device id if available. */
+  getCurrentVideoDeviceId(): string | null {
+    const track = this.stream?.getVideoTracks()[0];
+    const settings = track?.getSettings();
+    return settings?.deviceId ?? null;
+  }
+
   /** Requests webcam access, loads MediaPipe, and starts the continuous sampling loop. */
-  async initialize(video: HTMLVideoElement): Promise<void> {
+  async initialize(video: HTMLVideoElement, preferredDeviceId?: string): Promise<void> {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error("This browser does not support webcam access.");
     }
 
     this.video = video;
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 20, max: 20 },
-        facingMode: "user"
-      }
-    });
-
-    this.video.srcObject = this.stream;
-    this.video.muted = true;
-    this.video.playsInline = true;
-    await this.video.play();
+    this.stream = await this.requestStream(preferredDeviceId);
+    await this.attachStreamToVideo(this.stream);
 
     const vision = await FilesetResolver.forVisionTasks(WASM_ROOT);
     this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
@@ -78,6 +82,18 @@ export class PoseTracker {
 
     this.disposed = false;
     this.scheduleSampleLoop();
+  }
+
+  /** Switches the active webcam stream to a specific video input device id. */
+  async setVideoDevice(deviceId?: string): Promise<void> {
+    if (!this.video) {
+      throw new Error("Video preview element is not initialized.");
+    }
+    const nextStream = await this.requestStream(deviceId);
+    const previousStream = this.stream;
+    this.stream = nextStream;
+    await this.attachStreamToVideo(nextStream);
+    previousStream?.getTracks().forEach((track) => track.stop());
   }
 
   /** Returns the latest cached world-landmark pose from the background MediaPipe loop. */
@@ -143,6 +159,29 @@ export class PoseTracker {
       rightElbow: worldLandmarkToVec3(worldLandmarks[14], overlayLandmarks[14], ELBOW_VISIBILITY_THRESHOLD),
       rightWrist: worldLandmarkToVec3(worldLandmarks[16], overlayLandmarks[16], WRIST_VISIBILITY_THRESHOLD)
     };
+  }
+
+  private async requestStream(preferredDeviceId?: string): Promise<MediaStream> {
+    const videoConstraint: MediaTrackConstraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 20, max: 20 },
+      ...(preferredDeviceId ? { deviceId: { exact: preferredDeviceId } } : { facingMode: "user" })
+    };
+    return navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: videoConstraint
+    });
+  }
+
+  private async attachStreamToVideo(stream: MediaStream): Promise<void> {
+    if (!this.video) {
+      return;
+    }
+    this.video.srcObject = stream;
+    this.video.muted = true;
+    this.video.playsInline = true;
+    await this.video.play();
   }
 
   /** Releases camera, model, and the background sampling loop. */

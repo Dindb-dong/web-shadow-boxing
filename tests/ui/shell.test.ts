@@ -13,6 +13,8 @@ describe("createAppShell", () => {
     expect(shell.sceneHost.className).toContain("scene-host");
     expect(shell.videoPreview.tagName).toBe("VIDEO");
     expect(shell.videoOverlay.tagName).toBe("CANVAS");
+    expect(shell.cameraSelect.tagName).toBe("SELECT");
+    expect(shell.cameraSelect.options[0]?.textContent).toContain("Default camera");
     expect(shell.aiHpBar.tagName).toBe("DIV");
     expect(shell.aiHpValue.textContent).toContain("100");
     expect(shell.successfulHitsValue.textContent).toBe("0");
@@ -21,6 +23,8 @@ describe("createAppShell", () => {
     expect(shell.duckDefenseValue.textContent).toBe("0");
     expect(shell.weaveDefenseValue.textContent).toBe("0");
     expect(shell.swayDefenseValue.textContent).toBe("0");
+    expect(shell.liveStateValue.textContent).toBe("IDLE");
+    expect(shell.liveProbabilityValue.textContent).toBe("0%");
     expect(root?.textContent).toContain(`v${GAME_VERSION}`);
     expect(root?.textContent).toContain("Successful Hits");
     expect(root?.textContent).toContain("Defended Counters");
@@ -29,6 +33,9 @@ describe("createAppShell", () => {
     expect(root?.textContent).toContain("Weave");
     expect(root?.textContent).toContain("Sway");
     expect(root?.querySelector(".combat-stats-panel")?.textContent).toContain("Tight Guard");
+    expect(root?.textContent).toContain("Live Threat");
+    expect(root?.textContent).toContain("Attack Probability");
+    expect(root?.textContent).toContain("Camera");
     expect(root?.textContent).toContain("Debug HUD");
     expect(root?.textContent).toContain("Raw Attacking Prob");
     expect(root?.textContent).toContain("Last Emit Raw Prob");

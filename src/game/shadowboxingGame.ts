@@ -45,6 +45,7 @@ export class ShadowboxingGame {
   private threatTrajectoryEmitCount = 0;
   private lastDebugEvent = "Booting debug HUD";
   private debugLogLines = ["Booting debug HUD"];
+  private cameraSwitchInProgress = false;
   private latestHudSnapshot: HudSnapshot = {
     aiHp: 100,
     playerHp: 100,
@@ -100,6 +101,7 @@ export class ShadowboxingGame {
     this.hud = new HudController(this.shell);
     this.scene = new SceneManager(this.shell.sceneHost);
     this.poseOverlay = new PoseOverlayRenderer(this.shell.videoOverlay);
+    this.shell.cameraSelect.addEventListener("change", this.handleCameraSelectChange);
     window.addEventListener("resize", this.handleResize);
   }
 
@@ -111,6 +113,7 @@ export class ShadowboxingGame {
       await this.scene.initialize();
       await this.poseTracker.initialize(this.shell.videoPreview);
       await this.predictor.initialize();
+      await this.refreshCameraSelect();
       this.latestHudSnapshot.statusText = "Camera live. Building sequence buffer";
       this.hud.update(this.latestHudSnapshot);
       this.schedulePoseLoop();
@@ -133,6 +136,7 @@ export class ShadowboxingGame {
     }
     this.poseTracker.dispose();
     this.scene.dispose();
+    this.shell.cameraSelect.removeEventListener("change", this.handleCameraSelectChange);
     window.removeEventListener("resize", this.handleResize);
   }
 
@@ -140,6 +144,66 @@ export class ShadowboxingGame {
     this.scene.resize();
     this.poseOverlay.resize();
   };
+
+  private readonly handleCameraSelectChange = async (): Promise<void> => {
+    const nextDeviceId = this.shell.cameraSelect.value;
+    if (this.cameraSwitchInProgress) {
+      return;
+    }
+
+    this.cameraSwitchInProgress = true;
+    this.shell.cameraSelect.disabled = true;
+    try {
+      this.latestHudSnapshot.statusText = "Switching camera...";
+      this.hud.update(this.latestHudSnapshot);
+      await this.poseTracker.setVideoDevice(nextDeviceId || undefined);
+      await this.refreshCameraSelect();
+      this.latestHudSnapshot.statusText = "Camera switched.";
+      this.hud.update(this.latestHudSnapshot);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to switch camera";
+      this.latestHudSnapshot.statusText = message;
+      this.hud.update(this.latestHudSnapshot);
+      await this.refreshCameraSelect();
+    } finally {
+      this.cameraSwitchInProgress = false;
+      this.shell.cameraSelect.disabled = false;
+    }
+  };
+
+  private async refreshCameraSelect(): Promise<void> {
+    const devices = await this.poseTracker.getVideoInputDevices();
+    const activeDeviceId = this.poseTracker.getCurrentVideoDeviceId();
+    this.shell.cameraSelect.innerHTML = "";
+
+    if (!devices.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No camera inputs detected";
+      this.shell.cameraSelect.append(option);
+      this.shell.cameraSelect.disabled = true;
+      return;
+    }
+
+    const fallbackOption = document.createElement("option");
+    fallbackOption.value = "";
+    fallbackOption.textContent = "Default camera";
+    this.shell.cameraSelect.append(fallbackOption);
+
+    for (const device of devices) {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `Camera ${this.shell.cameraSelect.options.length}`;
+      this.shell.cameraSelect.append(option);
+    }
+
+    if (activeDeviceId) {
+      this.shell.cameraSelect.value = activeDeviceId;
+    } else {
+      this.shell.cameraSelect.value = "";
+    }
+    this.shell.cameraSelect.disabled = false;
+  }
 
   /** Clears the stable threat assessment when tracking becomes unusable. */
   private resetThreatAssessment(): void {
