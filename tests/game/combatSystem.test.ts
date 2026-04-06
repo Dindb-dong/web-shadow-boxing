@@ -206,7 +206,7 @@ function setAiStamina(system: CombatSystem, value: number): void {
 }
 
 describe("combatSystem", () => {
-  it("dodges, launches a counter first, then resolves hit/guard on a later tick", () => {
+  it("dodges and launches a counter immediately before resolving on a later tick", () => {
     const system = new CombatSystem(() => 0);
     const output = createOutput("attacking", 0.82);
     const threatTrajectory = createFaceThreatTrajectory();
@@ -219,16 +219,8 @@ describe("combatSystem", () => {
       worldTraj: threatTrajectory,
       userPose: createGuardPose(false)
     });
-    const launched = system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: threatTrajectory,
-      userPose: createGuardPose(false)
-    });
     const resolved = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,
@@ -237,14 +229,14 @@ describe("combatSystem", () => {
     });
 
     expect(first.triggerDodge).not.toBeNull();
+    expect(first.triggerCounter?.result).toBe("none");
     expect(first.snapshot.aiHp).toBe(100);
-    expect(launched.triggerCounter?.result).toBe("none");
-    expect(launched.snapshot.playerHp).toBe(100);
-    expect(launched.snapshot.lastGuardResult).toBe("none");
-    expect(launched.triggerCounter?.move).toBeDefined();
-    expect(launched.triggerCounter?.target?.x).toBeCloseTo(0);
-    expect(launched.triggerCounter?.target?.y).toBeCloseTo(2.08);
-    expect(launched.triggerCounter?.target?.z).toBeCloseTo(-0.8);
+    expect(first.snapshot.playerHp).toBe(100);
+    expect(first.snapshot.lastGuardResult).toBe("none");
+    expect(first.triggerCounter?.move).toBeDefined();
+    expect(first.triggerCounter?.target?.x).toBeCloseTo(0);
+    expect(first.triggerCounter?.target?.y).toBeCloseTo(2.08);
+    expect(first.triggerCounter?.target?.z).toBeCloseTo(-0.8);
     expect(first.snapshot.aiStamina).toBe(96);
     expect(resolved.triggerCounter).toBeNull();
     expect(resolved.snapshot.playerHp).toBe(88);
@@ -360,16 +352,8 @@ describe("combatSystem", () => {
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
-    const launched = system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: createFaceThreatTrajectory(),
-      userPose: createGuardPose(false)
-    });
     const result = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,
@@ -378,7 +362,7 @@ describe("combatSystem", () => {
     });
 
     expect(first.triggerDodge).not.toBeNull();
-    expect(launched.triggerCounter?.result).toBe("none");
+    expect(first.triggerCounter?.result).toBe("none");
     expect(result.triggerCounter).toBeNull();
     expect(result.snapshot.guardedCounters).toBe(1);
     expect(result.snapshot.playerHp).toBe(100);
@@ -399,16 +383,8 @@ describe("combatSystem", () => {
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
-    system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: createFaceThreatTrajectory(),
-      userPose: createGuardPose(false)
-    });
     const result = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,
@@ -435,16 +411,8 @@ describe("combatSystem", () => {
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
-    system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: createFaceThreatTrajectory(),
-      userPose: createGuardPose(false)
-    });
     const result = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,
@@ -471,16 +439,8 @@ describe("combatSystem", () => {
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
-    system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: createFaceThreatTrajectory(),
-      userPose: createGuardPose(false)
-    });
     const result = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,
@@ -499,7 +459,7 @@ describe("combatSystem", () => {
     const system = new CombatSystem(() => 0);
     const output = createOutput("attacking", 0.9);
 
-    system.update({
+    const first = system.update({
       now: 100,
       modelMode: "mock",
       tracking: true,
@@ -507,17 +467,8 @@ describe("combatSystem", () => {
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
-    const launched = system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: createFaceThreatTrajectory(),
-      userPose: createGuardPose(false)
-    });
-
     const result = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,
@@ -525,7 +476,7 @@ describe("combatSystem", () => {
       userPose: createSwayBackPose()
     });
 
-    expect(launched.triggerCounter?.result).toBe("none");
+    expect(first.triggerCounter?.result).toBe("none");
     expect(result.triggerCounter).toBeNull();
     expect(result.snapshot.guardedCounters).toBe(1);
     expect(result.snapshot.lastCounterDefense).toBe("sway");
@@ -545,16 +496,8 @@ describe("combatSystem", () => {
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
-    system.update({
-      now: 450,
-      modelMode: "mock",
-      tracking: true,
-      output,
-      worldTraj: createFaceThreatTrajectory(),
-      userPose: createGuardPose(false)
-    });
     const result = system.update({
-      now: 950,
+      now: 650,
       modelMode: "mock",
       tracking: true,
       output,

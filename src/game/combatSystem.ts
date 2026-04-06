@@ -341,7 +341,7 @@ export class CombatSystem {
     }
 
     const attackStarted = threatening && !this.attackActive;
-    const vulnerableToPunish = this.counterState === "primed" && this.counterLaunchAt !== null;
+    const vulnerableToPunish = this.counterState === "primed";
     debug = {
       avatarOverlap: avatarThreat,
       dodgeChance: null,
