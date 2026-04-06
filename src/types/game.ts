@@ -1,7 +1,7 @@
 export type StateName = "idle" | "attacking";
 export type DodgeType = "left_weave" | "right_weave" | "left_duck" | "right_duck";
 export type GuardResult = "guarded" | "hit" | "none";
-export type CounterDefenseType = "none" | "hit" | "tight_guard" | "duck" | "weave" | "sway" | "off_line";
+export type CounterDefenseType = "none" | "hit" | "tight_guard" | "duck" | "weave" | "sway";
 export type ModelMode = "mock" | "real";
 export type CounterMove =
   | "left_hook"
