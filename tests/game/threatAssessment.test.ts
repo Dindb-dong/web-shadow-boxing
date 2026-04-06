@@ -3,7 +3,7 @@ import type { ModelOutput } from "../../src/types/game";
 
 function createOutput(
   probability: number,
-  stateName: "idle" | "attacking" = probability >= 0.58 ? "attacking" : "idle"
+  stateName: "idle" | "attacking" = probability >= 0.3 ? "attacking" : "idle"
 ): ModelOutput {
   return {
     state_idx: stateName === "attacking" ? 1 : 0,
@@ -35,6 +35,12 @@ describe("threatAssessment", () => {
       false
     );
     expect(shouldEmitThreatTrajectory(createOutput(0.2, "idle"), createOutput(0.84, "attacking"))).toBe(
+      true
+    );
+  });
+
+  it("treats 0.3 as the new threatening cutoff for emit gating", () => {
+    expect(shouldEmitThreatTrajectory(createOutput(0.29, "idle"), createOutput(0.31, "attacking"))).toBe(
       true
     );
   });

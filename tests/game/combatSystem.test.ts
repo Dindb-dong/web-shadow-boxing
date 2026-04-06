@@ -85,6 +85,27 @@ function createSegmentCrossingFaceTrajectory(): WristPairTrajectory {
   ];
 }
 
+function createProjectedFaceThreatWithFarZTrajectory(): WristPairTrajectory {
+  return [
+    [
+      { x: -0.08, y: 1.74, z: -0.3 },
+      { x: -0.04, y: 1.77, z: -0.2 },
+      { x: 0, y: 1.8, z: -0.1 },
+      { x: 0.04, y: 1.78, z: 0 },
+      { x: 0.08, y: 1.75, z: 0.1 },
+      { x: 0.1, y: 1.72, z: 0.2 }
+    ],
+    [
+      { x: 0.24, y: 1.04, z: 0.15 },
+      { x: 0.27, y: 1.08, z: 0.24 },
+      { x: 0.3, y: 1.12, z: 0.33 },
+      { x: 0.32, y: 1.14, z: 0.42 },
+      { x: 0.35, y: 1.16, z: 0.51 },
+      { x: 0.38, y: 1.18, z: 0.6 }
+    ]
+  ];
+}
+
 function createOutput(stateName: "idle" | "attacking", probability: number): ModelOutput {
   return {
     state_idx: stateName === "attacking" ? 1 : 0,
@@ -202,6 +223,22 @@ describe("combatSystem", () => {
 
     expect(result.triggerDodge).toBeNull();
     expect(result.snapshot.activeThreat.stateName).toBe("idle");
+  });
+
+  it("treats a 0.31 attacking probability as a live threat", () => {
+    const system = new CombatSystem(() => 0);
+
+    const result = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.31),
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    expect(result.triggerDodge).not.toBeNull();
+    expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.31);
   });
 
   it("blocks a counter with the arm when the face moved off the target line", () => {
@@ -381,6 +418,22 @@ describe("combatSystem", () => {
     expect(result.triggerDodge).toBeNull();
     expect(result.snapshot.aiHp).toBe(86);
     expect(result.snapshot.successfulHits).toBe(1);
+  });
+
+  it("treats XY-overlapping threat paths as dangerous even when trajectory z stays far away", () => {
+    const system = new CombatSystem(() => 0);
+    const result = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.9),
+      worldTraj: createProjectedFaceThreatWithFarZTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    expect(result.triggerDodge).not.toBeNull();
+    expect(result.debug.avatarOverlap).toBe(true);
+    expect(result.snapshot.aiHp).toBe(100);
   });
 
   it("maps dodge direction to structured counter families", () => {

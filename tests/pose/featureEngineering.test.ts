@@ -83,9 +83,9 @@ describe("featureEngineering", () => {
   it("applies boxer_ai EMA smoothing after normalization", () => {
     const previous = normalizePoseFrame(createResolvedFrame(0));
     const current = normalizePoseFrame(createResolvedFrame(1));
-    const smoothed = smoothPoseFrame(current, previous, 0.7);
+    const smoothed = smoothPoseFrame(current, previous, 0.3);
 
-    expect(smoothed.leftWrist.x).toBeCloseTo(previous.leftWrist.x * 0.7 + current.leftWrist.x * 0.3);
+    expect(smoothed.leftWrist.x).toBeCloseTo(previous.leftWrist.x * 0.3 + current.leftWrist.x * 0.7);
   });
 
   it("emits a ready 12-step feature window only after collecting 12 feature frames", () => {

@@ -36,6 +36,12 @@ interface SphereHitbox {
   radius: number;
 }
 
+interface CircleHitbox {
+  centerX: number;
+  centerY: number;
+  radius: number;
+}
+
 interface CounterResolution {
   result: GuardResult;
   reason: "hit" | "blocked" | "sway" | "missed";
@@ -52,54 +58,53 @@ type DodgeSide = "left" | "right";
 const AI_FACE_HITBOX: SphereHitbox = { center: { x: 0, y: 1.82, z: -1.88 }, radius: 0.34 };
 const AI_TORSO_HITBOX: SphereHitbox = { center: { x: 0, y: 1.2, z: -1.96 }, radius: 0.5 };
 const AI_AVATAR_HITBOXES: SphereHitbox[] = [AI_FACE_HITBOX, AI_TORSO_HITBOX];
+const AI_AVATAR_XY_HITBOXES: CircleHitbox[] = AI_AVATAR_HITBOXES.map((sphere) => ({
+  centerX: sphere.center.x,
+  centerY: sphere.center.y,
+  radius: sphere.radius
+}));
 
-/** Returns whether the sampled trajectory point overlaps a spherical hitbox. */
-function pointInsideSphere(point: Vec3, sphere: SphereHitbox): boolean {
-  return distanceVec3(point, sphere.center) <= sphere.radius;
+/** Returns whether one XY point lands inside a projected circle hitbox. */
+function pointInsideCircleXY(point: Vec3, circle: CircleHitbox): boolean {
+  const deltaX = point.x - circle.centerX;
+  const deltaY = point.y - circle.centerY;
+  return deltaX * deltaX + deltaY * deltaY <= circle.radius * circle.radius;
 }
 
-/** Returns whether one trajectory segment intersects a spherical hitbox. */
-function segmentIntersectsSphere(start: Vec3, end: Vec3, sphere: SphereHitbox): boolean {
+/** Returns whether one XY trajectory segment intersects a projected circle hitbox. */
+function segmentIntersectsCircleXY(start: Vec3, end: Vec3, circle: CircleHitbox): boolean {
   const directionX = end.x - start.x;
   const directionY = end.y - start.y;
-  const directionZ = end.z - start.z;
-  const segmentLengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
+  const segmentLengthSquared = directionX * directionX + directionY * directionY;
 
   if (segmentLengthSquared <= 1e-8) {
-    return pointInsideSphere(start, sphere);
+    return pointInsideCircleXY(start, circle);
   }
 
-  const toCenterX = sphere.center.x - start.x;
-  const toCenterY = sphere.center.y - start.y;
-  const toCenterZ = sphere.center.z - start.z;
-  const rawProjection =
-    (toCenterX * directionX + toCenterY * directionY + toCenterZ * directionZ) / segmentLengthSquared;
+  const toCenterX = circle.centerX - start.x;
+  const toCenterY = circle.centerY - start.y;
+  const rawProjection = (toCenterX * directionX + toCenterY * directionY) / segmentLengthSquared;
   const projected = clamp(rawProjection, 0, 1);
   const nearestPoint: Vec3 = {
     x: start.x + directionX * projected,
     y: start.y + directionY * projected,
-    z: start.z + directionZ * projected
+    z: start.z
   };
 
-  return pointInsideSphere(nearestPoint, sphere);
+  return pointInsideCircleXY(nearestPoint, circle);
 }
 
-/** Returns whether one trajectory segment intersects any avatar hitbox. */
-function segmentIntersectsAnyHitbox(start: Vec3, end: Vec3, hitboxes: SphereHitbox[]): boolean {
-  return hitboxes.some((sphere) => segmentIntersectsSphere(start, end, sphere));
-}
-
-/** Returns whether either wrist path reaches the visible AI avatar volume. */
+/** Returns whether either wrist path reaches the visible AI avatar silhouette in XY across all 1-6 steps. */
 function trajectoryIntersectsAvatar(traj: WristPairTrajectory): boolean {
   return traj.some((wristSteps) => {
     for (let index = 0; index < wristSteps.length; index += 1) {
       const point = wristSteps[index];
-      if (AI_AVATAR_HITBOXES.some((sphere) => pointInsideSphere(point, sphere))) {
+      if (AI_AVATAR_XY_HITBOXES.some((circle) => pointInsideCircleXY(point, circle))) {
         return true;
       }
       if (
         index < wristSteps.length - 1 &&
-        segmentIntersectsAnyHitbox(point, wristSteps[index + 1], AI_AVATAR_HITBOXES)
+        AI_AVATAR_XY_HITBOXES.some((circle) => segmentIntersectsCircleXY(point, wristSteps[index + 1], circle))
       ) {
         return true;
       }

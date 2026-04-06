@@ -9,7 +9,7 @@ import type {
 } from "../types/game";
 import { distanceVec3, midpointVec3, scaleVec3, subVec3, vec3 } from "../utils/vector";
 
-const POSE_SMOOTHING_BETA = 0.7;
+const POSE_SMOOTHING_BETA = 0.3;
 const RECENT_POSES_MAXLEN = 3;
 
 const ARM_POINT_KEYS = [

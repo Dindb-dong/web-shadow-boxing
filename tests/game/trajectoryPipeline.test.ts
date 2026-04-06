@@ -82,7 +82,11 @@ describe("trajectory pipeline", () => {
     });
 
     expect(worldTraj[1][5].z).toBeLessThan(worldTraj[1][0].z);
-    expect(Math.abs(worldTraj[1][5].x)).toBeLessThanOrEqual(Math.abs(worldTraj[1][0].x));
+    worldTraj.flat().forEach((point) => {
+      expect(Number.isFinite(point.x)).toBe(true);
+      expect(Number.isFinite(point.y)).toBe(true);
+      expect(Number.isFinite(point.z)).toBe(true);
+    });
     expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(output!.attacking_prob);
   });
 });

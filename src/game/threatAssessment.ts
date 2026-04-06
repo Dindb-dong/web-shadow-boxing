@@ -2,7 +2,7 @@ import { THREAT_PROBABILITY_THRESHOLD } from "./constants";
 import { isThreateningOutput } from "../model/modelAdapter";
 import type { ModelOutput } from "../types/game";
 
-export const TRAJECTORY_RENDER_PROBABILITY_THRESHOLD = 0.62;
+export const TRAJECTORY_RENDER_PROBABILITY_THRESHOLD = THREAT_PROBABILITY_THRESHOLD;
 
 /** Returns whether a threatening trajectory should emit exactly once for a new punch window. */
 export function shouldEmitThreatTrajectory(

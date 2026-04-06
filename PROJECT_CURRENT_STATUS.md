@@ -1,10 +1,10 @@
 # PROJECT CURRENT STATUS
 
-Date: 2026-04-04
+Date: 2026-04-06
 
 ## Current Summary
 
-Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우저 클라이언트로 동작하며, 현재는 `사용자 MediaPipe 포즈 오버레이`, `실제 리깅된 Titan Boxer GLB 아바타`, `좌/우 위빙 및 좌/우 더킹 기반 복싱 카운터 패턴`을 유지한 채 공격 판정/궤도 계산을 `/Users/maxkim/boxer_ai` 파이프라인 기준으로 교체했다. 브라우저에서는 MediaPipe Pose를 `20 FPS`로 상시 실행하고, `pose_world_landmarks`의 `어깨/팔꿈치/손목 6개 관절 xyz`를 사용해 boxer_ai와 동일하게 `어깨 중심 이동 + 어깨 거리 정규화 + EMA smoothing(beta=0.7) + 위치/속도/가속도 54차 feature + 최근 12-step window`를 만든다. 기존 `MockPredictor`와 `AttackDetector`는 제거했고, 대신 boxer_ai의 실제 GRU 체크포인트(`checkpoints/20260331_004346/gru_model.pt`)를 브라우저용 JSON 가중치로 export해 TypeScript 단일-layer GRU 런타임에서 직접 추론한다. 공격 궤도는 `idle -> attacking` 위협 엣지에서 한 번만 emit되고, 훅처럼 넓은 공격은 측면에서 중앙으로 더 크게 들어오도록 world mapping을 보정했다. AI 피격/회피 판정도 같은 trajectory와 같은 avatar hitbox 기준으로 맞춰졌고, avatarThreat가 성립하면 stamina가 남아 있는 한 랜덤 없이 바로 회피로 진입하도록 묶었다. HP가 0이 되면 즉시 다운 모션을 재생한다. 이번 세션에서는 기존 가짜 sleeve arm overlay를 버리고, 외부에서 받은 `characters3d.com - Titan Boxer.glb`의 실제 humanoid skeleton(`Shoulder/Upper_Arm/Lower_Arm/Hand`)을 직접 구동하도록 바꿔 기본 가드와 카운터 주먹 뻗기가 아바타 본과 동기화되게 만들었다. MediaPipe task model도 원격 경로 대신 로컬 `public/assets/pose_landmarker_full.task`를 사용하도록 바꿨다.
+Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우저 클라이언트로 동작하며, 현재는 `사용자 MediaPipe 포즈 오버레이`, `실제 리깅된 Titan Boxer GLB 아바타`, `좌/우 위빙 및 좌/우 더킹 기반 복싱 카운터 패턴`을 유지한 채 공격 판정/궤도 계산을 `/Users/maxkim/boxer_ai` 파이프라인 기준으로 교체했다. 브라우저에서는 MediaPipe Pose를 `20 FPS`로 상시 실행하고, `pose_world_landmarks`의 `어깨/팔꿈치/손목 6개 관절 xyz`를 사용해 boxer_ai와 동일하게 `어깨 중심 이동 + 어깨 거리 정규화 + EMA smoothing(beta=0.3) + 위치/속도/가속도 54차 feature + 최근 12-step window`를 만든다. 기존 `MockPredictor`와 `AttackDetector`는 제거했고, 대신 boxer_ai의 실제 GRU 체크포인트(`checkpoints/gru_model.pt`)를 브라우저용 JSON 가중치로 export해 TypeScript 단일-layer GRU 런타임에서 직접 추론한다. 공격 판정과 trajectory emit은 모두 `attacking_prob >= 0.3` 기준으로 맞췄고, AI 회피 판정은 이제 world `z` 깊이보다 화면상 `XY` 경로를 우선해 예측된 1~6 step 손목 궤적 전체를 피하도록 계산한다. HP가 0이 되면 즉시 다운 모션을 재생한다. 이번 세션에서는 기존 가짜 sleeve arm overlay를 버리고, 외부에서 받은 `characters3d.com - Titan Boxer.glb`의 실제 humanoid skeleton(`Shoulder/Upper_Arm/Lower_Arm/Hand`)을 직접 구동하도록 바꿔 기본 가드와 카운터 주먹 뻗기가 아바타 본과 동기화되게 만들었다. MediaPipe task model도 원격 경로 대신 로컬 `public/assets/pose_landmarker_full.task`를 사용하도록 바꿨다.
 
 ## Current Behavior
 
@@ -38,7 +38,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 
 - 프론트엔드는 `src/pose`, `src/model`, `src/game`, `src/render`, `src/ui`, `src/types`로 역할을 분리했다.
 - `PoseSequenceBuffer`는 최근 3개 normalized pose와 최근 12개 feature frame을 유지하며 boxer_ai와 같은 모델 입력 window를 제공한다.
-- `CombatSystem`은 stamina 기반 강제 회피, 스태미나 회복/소모, avatar hitbox 기반 피격, 얼굴 좌표 기반 counter 타기팅, sway/block 판정, 세션 누적 전투 통계를 독립적으로 관리한다. 피격은 궤적 점 샘플뿐 아니라 점 사이 선분이 avatar hitbox를 통과하는 경우도 판정한다.
+- `CombatSystem`은 stamina 기반 강제 회피, 스태미나 회복/소모, avatar hitbox 기반 피격, 얼굴 좌표 기반 counter 타기팅, sway/block 판정, 세션 누적 전투 통계를 독립적으로 관리한다. 피격/회피는 world 경로의 `z` 일치 여부보다 화면상 `XY` 궤적 점열과 선분이 아바타 실루엣을 통과하는지를 우선해 판정한다.
 - `ShadowboxingGame`은 raw predictor output을 매 샘플마다 계산하고, `threatAssessment.ts`에서 `attackStarted` 성격의 위협 엣지를 판정해 trajectory emit 시점을 제어한다. 같은 순간의 predictor output이 `CombatSystem`, trajectory render, Debug HUD, 브라우저 콘솔 로그에 공통으로 전달된다.
 - `worldMapping.ts`는 현재 pose landmark 자체를 world space로 옮기는 `mapBodyPointToWorld`와, normalized wrist trajectory를 상대 전투공간용 위협 경로로 투영하는 `trajectoryToWorld`를 분리된 역할로 운영한다. 후자는 어깨 anchor 대비 extension, horizon progress, x축 중앙 수렴, wide hook 감지 기반 측면 spread 유지, 얼굴 높이 pull, 상대 face plane depth projection을 함께 적용한다.
 - `PoseOverlayRenderer`가 비디오 원본 비율과 카드 비율 차이를 계산해 2D 캔버스를 보정한 뒤, 현재는 상체 랜드마크만 웹캠 프리뷰 위에 오버레이한다.
@@ -49,7 +49,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. 동시에 imported humanoid skeleton의 `Shoulder -> Upper Arm -> Lower Arm -> Hand` 체인을 직접 풀어 기본 가드 자세와 counter 펀치 연결감을 유지한다. dodge 중에는 이동 방향 반대쪽 어깨가 리드되도록 별도 torso yaw/roll을 적용한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 idle/counter 모두에서 hand bone 위치에 동기화되며, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.10`으로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.12`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
@@ -79,6 +79,8 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 후속 손/가드 보정에서는 손가락 curl 축을 손가락 local x 중심으로 다시 맞춰 손이 옆으로 펴지지 않게 조정했고, hand roll도 크게 줄였다. 동시에 기본 가드는 `덜 전방 + 더 높은 y`로 재설정해 팔이 지나치게 앞으로 뻗어 보이지 않도록 조정했고, guard y/z 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.8`이다.
 - 이번 추가 내회전 보정에서는 upper arm / lower arm에 축방향 inward twist를 넣어 손바닥이 얼굴 쪽을 향하도록 조정했고, hand/finger pose는 과한 claw를 줄이는 쪽으로 다시 다듬었다. 동시에 guard는 더 높게 올리고 전방 bias는 다시 줄여, 기본 자세가 뻗은 자세가 아니라 접힌 복서 가드에 가깝게 보이도록 조정했다. 현재 버전 표기는 `1.3.9`이다.
 - 이번 후속 재보정에서는 손가락 본을 더 강하게 접는 대신 finger scale도 함께 줄여 글러브 안쪽으로 정리되도록 바꿨고, glove mesh는 다시 손보다 앞쪽으로 덮이게 보정했다. 동시에 upper/lower arm inward twist를 더 키워 손바닥이 얼굴 쪽을 더 분명히 향하도록 조정했고, guard 높이/전방 거리도 다시 균형점으로 되돌렸다. 현재 버전 표기는 `1.3.10`이다.
+- 이번 후속 모델 갱신에서는 exporter가 외부 절대경로가 아니라 로컬 `checkpoints/gru_model.pt`를 읽도록 바꿨고, 팀원이 전달한 새 `.pt` 체크포인트를 브라우저용 `src/model/assets/boxerAiWeights.json`으로 다시 export했다. 현재 버전 표기는 `1.3.11`이다.
+- 이번 후속 추론 튜닝에서는 팀원이 전달한 운영 가이드에 맞춰 pose EMA beta를 `0.3`으로 낮추고, 공격/trajectory emit 임계치를 `attacking_prob >= 0.3`으로 통일했다. 동시에 AI 회피 판정은 3D depth 일치보다 예측된 1~6 step 손목 궤적의 `XY` 폴리라인 전체가 아바타 실루엣을 지나는지 기준으로 바꿨고, 이에 대한 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.12`이다.
 
 ## Current Limitations
 
