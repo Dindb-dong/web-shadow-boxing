@@ -5,6 +5,7 @@ export function createAppShell(container: HTMLElement): {
   sceneHost: HTMLDivElement;
   videoPreview: HTMLVideoElement;
   videoOverlay: HTMLCanvasElement;
+  cameraSelect: HTMLSelectElement;
   aiHpBar: HTMLDivElement;
   aiHpValue: HTMLSpanElement;
   successfulHitsValue: HTMLSpanElement;
@@ -16,6 +17,9 @@ export function createAppShell(container: HTMLElement): {
   trackingValue: HTMLSpanElement;
   stateValue: HTMLSpanElement;
   probabilityValue: HTMLSpanElement;
+  liveThreatPanel: HTMLDivElement;
+  liveStateValue: HTMLSpanElement;
+  liveProbabilityValue: HTMLSpanElement;
   modelValue: HTMLSpanElement;
   statusValue: HTMLParagraphElement;
   playerHpBar: HTMLDivElement;
@@ -64,6 +68,14 @@ export function createAppShell(container: HTMLElement): {
           <h1>Live Sparring Arena</h1>
           <p class="status-line" data-role="status">Camera warmup in progress</p>
         </div>
+        <div class="hud-panel live-threat-panel" data-role="live-threat-panel" data-threat="idle">
+          <p class="eyebrow">Live Threat</p>
+          <strong class="live-threat-state" data-role="live-state">IDLE</strong>
+          <div class="live-threat-probability">
+            <span>Attack Probability</span>
+            <strong data-role="live-probability">0%</strong>
+          </div>
+        </div>
         <div class="hud-panel debug-panel">
           <p class="eyebrow">Debug HUD</p>
           <div class="metric-row"><span>Raw Threat</span><strong data-role="debug-raw-threat">idle / 0.00</strong></div>
@@ -87,7 +99,12 @@ export function createAppShell(container: HTMLElement): {
           <div class="hud-panel video-panel">
             <div class="video-header">
               <div class="video-label">Player Pose Feed</div>
-              <div class="video-hint">MediaPipe overlay active</div>
+              <div class="camera-controls">
+                <label class="camera-select-label" for="camera-select">Camera</label>
+                <select id="camera-select" class="camera-select" data-role="camera-select">
+                  <option value="">Default camera</option>
+                </select>
+              </div>
             </div>
             <div class="camera-stack">
               <video class="camera-preview" autoplay muted playsinline></video>
@@ -116,6 +133,7 @@ export function createAppShell(container: HTMLElement): {
   const sceneHost = container.querySelector<HTMLDivElement>(".scene-host");
   const videoPreview = container.querySelector<HTMLVideoElement>(".camera-preview");
   const videoOverlay = container.querySelector<HTMLCanvasElement>(".camera-overlay");
+  const cameraSelect = container.querySelector<HTMLSelectElement>("[data-role='camera-select']");
   const aiHpBar = container.querySelector<HTMLDivElement>("[data-role='ai-hp']");
   const aiHpValue = container.querySelector<HTMLSpanElement>("[data-role='ai-hp-value']");
   const successfulHitsValue = container.querySelector<HTMLSpanElement>("[data-role='successful-hits']");
@@ -127,6 +145,9 @@ export function createAppShell(container: HTMLElement): {
   const trackingValue = container.querySelector<HTMLSpanElement>("[data-role='tracking']");
   const stateValue = container.querySelector<HTMLSpanElement>("[data-role='state']");
   const probabilityValue = container.querySelector<HTMLSpanElement>("[data-role='probability']");
+  const liveThreatPanel = container.querySelector<HTMLDivElement>("[data-role='live-threat-panel']");
+  const liveStateValue = container.querySelector<HTMLSpanElement>("[data-role='live-state']");
+  const liveProbabilityValue = container.querySelector<HTMLSpanElement>("[data-role='live-probability']");
   const modelValue = container.querySelector<HTMLSpanElement>("[data-role='model']");
   const statusValue = container.querySelector<HTMLParagraphElement>("[data-role='status']");
   const playerHpBar = container.querySelector<HTMLDivElement>("[data-role='player-hp']");
@@ -153,6 +174,7 @@ export function createAppShell(container: HTMLElement): {
     !sceneHost ||
     !videoPreview ||
     !videoOverlay ||
+    !cameraSelect ||
     !aiHpBar ||
     !aiHpValue ||
     !successfulHitsValue ||
@@ -164,6 +186,9 @@ export function createAppShell(container: HTMLElement): {
     !trackingValue ||
     !stateValue ||
     !probabilityValue ||
+    !liveThreatPanel ||
+    !liveStateValue ||
+    !liveProbabilityValue ||
     !modelValue ||
     !statusValue ||
     !playerHpBar ||
@@ -193,6 +218,7 @@ export function createAppShell(container: HTMLElement): {
     sceneHost,
     videoPreview,
     videoOverlay,
+    cameraSelect,
     aiHpBar,
     aiHpValue,
     successfulHitsValue,
@@ -204,6 +230,9 @@ export function createAppShell(container: HTMLElement): {
     trackingValue,
     stateValue,
     probabilityValue,
+    liveThreatPanel,
+    liveStateValue,
+    liveProbabilityValue,
     modelValue,
     statusValue,
     playerHpBar,
