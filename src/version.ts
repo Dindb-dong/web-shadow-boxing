@@ -1,2 +1,2 @@
 /** Current in-game build version shown in the HUD. */
-export const GAME_VERSION = "1.3.12";
+export const GAME_VERSION = "1.3.13";

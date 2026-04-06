@@ -219,6 +219,18 @@ export class CombatSystem {
   private attackActive = false;
   private attackResolved = false;
 
+  /** Rearms dodge/counter state once one punch window has fully expired. */
+  private rearmThreatWindow(): void {
+    this.threatExpiresAt = null;
+    this.attackActive = false;
+    this.attackResolved = false;
+    this.dodgeType = null;
+    if (this.counterState === "resolved") {
+      this.counterState = "idle";
+      this.counterMove = null;
+    }
+  }
+
   /** Advances combat state using the latest prediction and user pose. */
   update(params: {
     now: number;
@@ -285,6 +297,14 @@ export class CombatSystem {
     this.threatProbability = output.attacking_prob;
     const threatening = isThreateningOutput(output, THREAT_PROBABILITY_THRESHOLD);
     const avatarThreat = threatening && trajectoryIntersectsAvatar(worldTraj);
+    const attackWindowExpired = this.threatExpiresAt !== null && now >= this.threatExpiresAt;
+
+    if (!threatening) {
+      this.rearmThreatWindow();
+    } else if (attackWindowExpired && this.counterState !== "primed") {
+      this.rearmThreatWindow();
+    }
+
     const attackStarted = threatening && !this.attackActive;
     const vulnerableToPunish = this.counterState === "primed" && this.counterLaunchAt !== null;
     debug = {
@@ -294,14 +314,9 @@ export class CombatSystem {
       attackStartedEdge: attackStarted
     };
 
-    if (threatening) {
-      this.threatExpiresAt = now + DODGE_DURATION_MS;
-    }
     if (attackStarted) {
+      this.threatExpiresAt = now + DODGE_DURATION_MS;
       this.attackActive = true;
-      this.attackResolved = false;
-    } else if (!threatening) {
-      this.attackActive = false;
       this.attackResolved = false;
     }
 
@@ -410,7 +425,7 @@ export class CombatSystem {
       activeThreat: {
         stateName: this.threatStateName,
         attackingProb: this.threatProbability,
-        active: this.threatExpiresAt !== null,
+        active: this.attackActive || this.threatExpiresAt !== null,
         expiresAt: this.threatExpiresAt
       },
       lastGuardResult: this.lastGuardResult,

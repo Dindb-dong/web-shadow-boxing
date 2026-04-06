@@ -208,6 +208,50 @@ describe("combatSystem", () => {
     expect(resolved.snapshot.lastGuardResult).toBe("hit");
   });
 
+  it("rearms a new dodge window after one continuous threatening stream finishes its prior counter cycle", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.82);
+    const threatTrajectory = createFaceThreatTrajectory();
+
+    const first = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: threatTrajectory,
+      userPose: createGuardPose(false)
+    });
+    system.update({
+      now: 450,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: threatTrajectory,
+      userPose: createGuardPose(false)
+    });
+    system.update({
+      now: 950,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: threatTrajectory,
+      userPose: createGuardPose(false)
+    });
+    const rearmed = system.update({
+      now: 1050,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: threatTrajectory,
+      userPose: createGuardPose(false)
+    });
+
+    expect(first.triggerDodge).not.toBeNull();
+    expect(rearmed.triggerDodge).not.toBeNull();
+    expect(rearmed.debug.attackStartedEdge).toBe(true);
+    expect(rearmed.snapshot.aiHp).toBe(100);
+  });
+
   it("does not dodge idle predictions even if a path exists", () => {
     const system = new CombatSystem();
     const output = createOutput("idle", 0.2);

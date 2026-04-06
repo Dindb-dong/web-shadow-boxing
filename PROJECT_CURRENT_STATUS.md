@@ -49,7 +49,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. 동시에 imported humanoid skeleton의 `Shoulder -> Upper Arm -> Lower Arm -> Hand` 체인을 직접 풀어 기본 가드 자세와 counter 펀치 연결감을 유지한다. dodge 중에는 이동 방향 반대쪽 어깨가 리드되도록 별도 torso yaw/roll을 적용한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 idle/counter 모두에서 hand bone 위치에 동기화되며, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.12`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.13`으로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
@@ -81,6 +81,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 후속 재보정에서는 손가락 본을 더 강하게 접는 대신 finger scale도 함께 줄여 글러브 안쪽으로 정리되도록 바꿨고, glove mesh는 다시 손보다 앞쪽으로 덮이게 보정했다. 동시에 upper/lower arm inward twist를 더 키워 손바닥이 얼굴 쪽을 더 분명히 향하도록 조정했고, guard 높이/전방 거리도 다시 균형점으로 되돌렸다. 현재 버전 표기는 `1.3.10`이다.
 - 이번 후속 모델 갱신에서는 exporter가 외부 절대경로가 아니라 로컬 `checkpoints/gru_model.pt`를 읽도록 바꿨고, 팀원이 전달한 새 `.pt` 체크포인트를 브라우저용 `src/model/assets/boxerAiWeights.json`으로 다시 export했다. 현재 버전 표기는 `1.3.11`이다.
 - 이번 후속 추론 튜닝에서는 팀원이 전달한 운영 가이드에 맞춰 pose EMA beta를 `0.3`으로 낮추고, 공격/trajectory emit 임계치를 `attacking_prob >= 0.3`으로 통일했다. 동시에 AI 회피 판정은 3D depth 일치보다 예측된 1~6 step 손목 궤적의 `XY` 폴리라인 전체가 아바타 실루엣을 지나는지 기준으로 바꿨고, 이에 대한 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.12`이다.
+- 이번 후속 전투 상태머신 수정에서는 낮아진 공격 임계치 때문에 predictor 출력이 연속 `attacking`으로 유지될 때 AI가 첫 회피 이후 `dodgeType/counterState=resolved/attackActive`에 묶여 다시 회피하지 못하던 버그를 고쳤다. 이제 한 펀치 윈도우가 끝나면 같은 threatening 스트림 안에서도 상태를 재무장해 다음 펀치를 새 공격으로 다시 처리하고, 이 케이스를 고정하는 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.13`이다.
 
 ## Current Limitations
 
