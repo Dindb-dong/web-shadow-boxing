@@ -202,13 +202,19 @@ describe("resolveElbowPole", () => {
 });
 
 describe("resolveFingerCurlPose", () => {
-  it("uses a deeper thumb opposition pose instead of leaving the thumb extended", () => {
+  it("folds the thumb sideways across the fist instead of pointing it upward", () => {
     const thumbProximal = resolveFingerCurlPose("L_Thumb_Proximal", -1);
+    const thumbIntermediate = resolveFingerCurlPose("L_Thumb_Intermediate", -1);
     const thumbDistal = resolveFingerCurlPose("L_Thumb_Distal", -1);
 
-    expect(thumbProximal.x).toBeGreaterThan(0.8);
-    expect(Math.abs(thumbProximal.y)).toBeGreaterThan(0.35);
-    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.65);
+    expect(thumbProximal.x).toBeGreaterThan(0.75);
+    expect(Math.abs(thumbProximal.y)).toBeLessThan(0.3);
+    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.6);
+    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(Math.abs(thumbProximal.y));
+    expect(Math.abs(thumbIntermediate.y)).toBeGreaterThan(0.25);
+    expect(Math.abs(thumbIntermediate.z)).toBeGreaterThan(0.5);
+    expect(Math.abs(thumbDistal.y)).toBeLessThan(0.01);
+    expect(Math.abs(thumbDistal.z)).toBeLessThan(0.15);
     expect(thumbDistal.scale).toBeLessThan(0.95);
   });
 

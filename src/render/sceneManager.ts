@@ -391,12 +391,12 @@ export function resolveFingerCurlPose(boneName: string, side: -1 | 1): FingerCur
   const isIntermediate = boneName.includes("Intermediate");
 
   if (isThumb) {
-    // Thumb opposition is a combined flexion + palmar abduction + medial rotation motion,
-    // so distribute the pose across axes instead of over-flexing one hinge.
+    // The Titan Boxer thumb reads best when it curls sideways across the fist,
+    // not when it points upward or drops straight down.
     return {
-      x: isProximal ? 0.86 : isIntermediate ? 0.62 : 0.42,
-      y: side * (isProximal ? -0.42 : isIntermediate ? -0.26 : -0.16),
-      z: side * (isProximal ? -0.72 : isIntermediate ? -0.46 : -0.28),
+      x: isProximal ? 0.82 : isIntermediate ? 0.6 : 0.4,
+      y: side * (isProximal ? -0.24 : isIntermediate ? -0.28 : 0),
+      z: side * (isProximal ? -0.66 : isIntermediate ? -0.58 : -0.1),
       scale: isProximal ? 0.84 : isIntermediate ? 0.89 : 0.94
     };
   }
