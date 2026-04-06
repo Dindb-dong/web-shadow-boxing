@@ -112,6 +112,13 @@ function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1);
 }
 
+export interface FingerCurlPose {
+  x: number;
+  y: number;
+  z: number;
+  scale: number;
+}
+
 /** Scores one wrist path so rendering can prefer the hand that actually threw the punch. */
 function scoreThreatPath(path: WristTrajectory): number {
   let pathLength = 0;
@@ -328,6 +335,12 @@ function captureFingerCurlStates(root: THREE.Object3D, prefix: "L" | "R"): Finge
     `${prefix}_Ring_Proximal`,
     `${prefix}_Ring_Intermediate`,
     `${prefix}_Ring_Distal`,
+    `${prefix}_Little_Proximal`,
+    `${prefix}_Little_Intermediate`,
+    `${prefix}_Little_Distal`,
+    `${prefix}_Pinky_Proximal`,
+    `${prefix}_Pinky_Intermediate`,
+    `${prefix}_Pinky_Distal`,
     `${prefix}_Thumb_Proximal`,
     `${prefix}_Thumb_Intermediate`,
     `${prefix}_Thumb_Distal`
@@ -367,6 +380,33 @@ function captureArmBoneChain(root: THREE.Object3D, side: -1 | 1): ArmBoneChain |
     upperLength: lowerArm.position.length(),
     lowerLength: hand.position.length(),
     side
+  };
+}
+
+/** Returns the imported finger curl offsets needed for a tighter boxing fist pose. */
+export function resolveFingerCurlPose(boneName: string, side: -1 | 1): FingerCurlPose {
+  const isThumb = boneName.includes("Thumb");
+  const isPinky = boneName.includes("Pinky") || boneName.includes("Little");
+  const isProximal = boneName.includes("Proximal");
+  const isIntermediate = boneName.includes("Intermediate");
+
+  if (isThumb) {
+    // Thumb opposition is a combined flexion + palmar abduction + medial rotation motion,
+    // so distribute the pose across axes instead of over-flexing one hinge.
+    return {
+      x: isProximal ? 0.86 : isIntermediate ? 0.62 : 0.42,
+      y: side * (isProximal ? -0.42 : isIntermediate ? -0.26 : -0.16),
+      z: side * (isProximal ? -0.72 : isIntermediate ? -0.46 : -0.28),
+      scale: isProximal ? 0.84 : isIntermediate ? 0.89 : 0.94
+    };
+  }
+
+  const baseX = isPinky ? (isProximal ? 1.8 : isIntermediate ? 1.5 : 1.22) : isProximal ? 1.34 : isIntermediate ? 1.08 : 0.86;
+  return {
+    x: baseX,
+    y: isPinky ? side * 0.12 : 0,
+    z: isPinky ? side * -0.34 : 0,
+    scale: isPinky ? 0.72 : 0.82
   };
 }
 
@@ -1052,20 +1092,10 @@ export class SceneManager {
     for (const finger of chain.fingerCurlBones) {
       finger.bone.quaternion.copy(finger.restQuaternion);
       finger.bone.scale.copy(finger.restScale);
-
-      const isThumb = finger.bone.name.includes("Thumb");
-      const isProximal = finger.bone.name.includes("Proximal");
-      const isIntermediate = finger.bone.name.includes("Intermediate");
-      const curlEuler = isThumb
-        ? new THREE.Euler(0.48, chain.side * 0.34, chain.side * 0.28, "XYZ")
-        : new THREE.Euler(
-            isProximal ? 1.34 : isIntermediate ? 1.08 : 0.86,
-            0,
-            0,
-            "XYZ"
-          );
+      const curlPose = resolveFingerCurlPose(finger.bone.name, chain.side);
+      const curlEuler = new THREE.Euler(curlPose.x, curlPose.y, curlPose.z, "XYZ");
       finger.bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(curlEuler));
-      finger.bone.scale.multiplyScalar(isThumb ? 0.88 : 0.82);
+      finger.bone.scale.multiplyScalar(curlPose.scale);
     }
   }
 

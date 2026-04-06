@@ -3,6 +3,7 @@ import {
   biasTargetTowardViewer,
   resolveRenderableThreatPath,
   resolveElbowPole,
+  resolveFingerCurlPose,
   resolveArmInwardTwist,
   resolveArmRigPose,
   resolveArmViewOrder,
@@ -197,5 +198,34 @@ describe("resolveElbowPole", () => {
     expect(Math.abs(rightPole.x)).toBeLessThan(0.3);
     expect(leftPole.y).toBeLessThan(-0.8);
     expect(rightPole.y).toBeLessThan(-0.8);
+  });
+});
+
+describe("resolveFingerCurlPose", () => {
+  it("uses a deeper thumb opposition pose instead of leaving the thumb extended", () => {
+    const thumbProximal = resolveFingerCurlPose("L_Thumb_Proximal", -1);
+    const thumbDistal = resolveFingerCurlPose("L_Thumb_Distal", -1);
+
+    expect(thumbProximal.x).toBeGreaterThan(0.8);
+    expect(Math.abs(thumbProximal.y)).toBeGreaterThan(0.35);
+    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.65);
+    expect(thumbDistal.scale).toBeLessThan(0.95);
+  });
+
+  it("keeps the pinky tighter than the index while also drawing it inward for a fist cup", () => {
+    const pinkyProximal = resolveFingerCurlPose("R_Pinky_Proximal", 1);
+    const indexProximal = resolveFingerCurlPose("R_Index_Proximal", 1);
+
+    expect(pinkyProximal.x).toBeGreaterThan(indexProximal.x);
+    expect(pinkyProximal.scale).toBeLessThan(indexProximal.scale);
+    expect(pinkyProximal.y).toBeGreaterThan(0.1);
+    expect(pinkyProximal.z).toBeLessThan(-0.3);
+  });
+
+  it("treats Little finger bones as the pinky chain used by the Titan Boxer rig", () => {
+    const littleProximal = resolveFingerCurlPose("R_Little_Proximal", 1);
+    const pinkyProximal = resolveFingerCurlPose("R_Pinky_Proximal", 1);
+
+    expect(littleProximal).toEqual(pinkyProximal);
   });
 });
