@@ -249,6 +249,11 @@ describe("combatSystem", () => {
     expect(resolved.triggerCounter).toBeNull();
     expect(resolved.snapshot.playerHp).toBe(88);
     expect(resolved.snapshot.lastGuardResult).toBe("hit");
+    expect(resolved.snapshot.lastCounterDefense).toBe("hit");
+    expect(resolved.snapshot.counterDefenseStats.tightGuard).toBe(0);
+    expect(resolved.snapshot.counterDefenseStats.duck).toBe(0);
+    expect(resolved.snapshot.counterDefenseStats.weave).toBe(0);
+    expect(resolved.snapshot.counterDefenseStats.sway).toBe(0);
   });
 
   it("rearms a new dodge window after one continuous threatening stream finishes its prior counter cycle", () => {
@@ -312,7 +317,7 @@ describe("combatSystem", () => {
     expect(result.snapshot.activeThreat.stateName).toBe("idle");
   });
 
-  it("treats a 0.31 attacking probability as a live threat", () => {
+  it("does not treat sub-0.5 attacking probability as a live threat", () => {
     const system = new CombatSystem(() => 0);
 
     const result = system.update({
@@ -324,8 +329,24 @@ describe("combatSystem", () => {
       userPose: createGuardPose(false)
     });
 
-    expect(result.triggerDodge).not.toBeNull();
+    expect(result.triggerDodge).toBeNull();
     expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.31);
+  });
+
+  it("treats 0.5-and-up attacking probability as a live threat", () => {
+    const system = new CombatSystem(() => 0);
+
+    const result = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.51),
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    expect(result.triggerDodge).not.toBeNull();
+    expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.51);
   });
 
   it("counts only a tight wrist guard near the nose as a blocked counter", () => {
@@ -361,6 +382,8 @@ describe("combatSystem", () => {
     expect(result.triggerCounter).toBeNull();
     expect(result.snapshot.guardedCounters).toBe(1);
     expect(result.snapshot.playerHp).toBe(100);
+    expect(result.snapshot.lastCounterDefense).toBe("tight_guard");
+    expect(result.snapshot.counterDefenseStats.tightGuard).toBe(1);
     expect(result.snapshot.statusText).toContain("blocked");
   });
 
@@ -395,6 +418,8 @@ describe("combatSystem", () => {
 
     expect(result.snapshot.guardedCounters).toBe(0);
     expect(result.snapshot.playerHp).toBe(88);
+    expect(result.snapshot.lastCounterDefense).toBe("hit");
+    expect(result.snapshot.counterDefenseStats.tightGuard).toBe(0);
     expect(result.snapshot.statusText).toContain("found your face");
   });
 
@@ -429,6 +454,8 @@ describe("combatSystem", () => {
 
     expect(result.snapshot.guardedCounters).toBe(1);
     expect(result.snapshot.playerHp).toBe(100);
+    expect(result.snapshot.lastCounterDefense).toBe("duck");
+    expect(result.snapshot.counterDefenseStats.duck).toBe(1);
     expect(result.snapshot.statusText).toContain("ducked");
   });
 
@@ -463,6 +490,8 @@ describe("combatSystem", () => {
 
     expect(result.snapshot.guardedCounters).toBe(1);
     expect(result.snapshot.playerHp).toBe(100);
+    expect(result.snapshot.lastCounterDefense).toBe("weave");
+    expect(result.snapshot.counterDefenseStats.weave).toBe(1);
     expect(result.snapshot.statusText).toContain("weaved");
   });
 
@@ -499,6 +528,8 @@ describe("combatSystem", () => {
     expect(launched.triggerCounter?.result).toBe("none");
     expect(result.triggerCounter).toBeNull();
     expect(result.snapshot.guardedCounters).toBe(1);
+    expect(result.snapshot.lastCounterDefense).toBe("sway");
+    expect(result.snapshot.counterDefenseStats.sway).toBe(1);
     expect(result.snapshot.statusText).toContain("slipped back");
   });
 

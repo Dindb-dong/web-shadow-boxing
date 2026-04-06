@@ -16,7 +16,7 @@ describe("modelAdapter", () => {
     expect(adapted).not.toBeNull();
     expect(adapted?.attacking_prob).toBe(1);
     expect(adapted?.traj[0]).toHaveLength(6);
-    expect(isThreateningOutput(adapted!, 0.3)).toBe(true);
+    expect(isThreateningOutput(adapted!, 0.5)).toBe(true);
   });
 
   it("rejects malformed trajectory shapes", () => {
@@ -43,6 +43,6 @@ describe("modelAdapter", () => {
     });
 
     expect(adapted).not.toBeNull();
-    expect(isThreateningOutput(adapted!, 0.3)).toBe(false);
+    expect(isThreateningOutput(adapted!, 0.5)).toBe(false);
   });
 });

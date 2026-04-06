@@ -9,6 +9,10 @@ export class HudController {
       aiHpValue: HTMLSpanElement;
       successfulHitsValue: HTMLSpanElement;
       guardedCountersValue: HTMLSpanElement;
+      tightGuardDefenseValue: HTMLSpanElement;
+      duckDefenseValue: HTMLSpanElement;
+      weaveDefenseValue: HTMLSpanElement;
+      swayDefenseValue: HTMLSpanElement;
       trackingValue: HTMLSpanElement;
       stateValue: HTMLSpanElement;
       probabilityValue: HTMLSpanElement;
@@ -42,6 +46,10 @@ export class HudController {
     this.refs.aiHpValue.textContent = `${Math.round(clamp(snapshot.aiHp, 0, 100))}%`;
     this.refs.successfulHitsValue.textContent = `${snapshot.successfulHits}`;
     this.refs.guardedCountersValue.textContent = `${snapshot.guardedCounters}`;
+    this.refs.tightGuardDefenseValue.textContent = `${snapshot.counterDefenseStats.tightGuard}`;
+    this.refs.duckDefenseValue.textContent = `${snapshot.counterDefenseStats.duck}`;
+    this.refs.weaveDefenseValue.textContent = `${snapshot.counterDefenseStats.weave}`;
+    this.refs.swayDefenseValue.textContent = `${snapshot.counterDefenseStats.sway}`;
     this.refs.trackingValue.textContent = snapshot.trackingLabel;
     this.refs.stateValue.textContent = snapshot.stateLabel;
     this.refs.probabilityValue.textContent = snapshot.attackingProbLabel;

@@ -17,9 +17,18 @@ describe("createAppShell", () => {
     expect(shell.aiHpValue.textContent).toContain("100");
     expect(shell.successfulHitsValue.textContent).toBe("0");
     expect(shell.guardedCountersValue.textContent).toBe("0");
+    expect(shell.tightGuardDefenseValue.textContent).toBe("0");
+    expect(shell.duckDefenseValue.textContent).toBe("0");
+    expect(shell.weaveDefenseValue.textContent).toBe("0");
+    expect(shell.swayDefenseValue.textContent).toBe("0");
     expect(root?.textContent).toContain(`v${GAME_VERSION}`);
     expect(root?.textContent).toContain("Successful Hits");
     expect(root?.textContent).toContain("Defended Counters");
+    expect(root?.textContent).toContain("Tight Guard");
+    expect(root?.textContent).toContain("Duck");
+    expect(root?.textContent).toContain("Weave");
+    expect(root?.textContent).toContain("Sway");
+    expect(root?.querySelector(".combat-stats-panel")?.textContent).toContain("Tight Guard");
     expect(root?.textContent).toContain("Debug HUD");
     expect(root?.textContent).toContain("Raw Attacking Prob");
     expect(root?.textContent).toContain("Last Emit Raw Prob");

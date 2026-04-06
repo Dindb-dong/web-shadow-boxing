@@ -19,6 +19,7 @@ import {
 } from "./constants";
 import type {
   CombatSnapshot,
+  CounterDefenseType,
   CounterTrigger,
   CounterMove,
   DodgeType,
@@ -48,6 +49,19 @@ interface CircleHitbox {
 interface CounterResolution {
   result: GuardResult;
   reason: "hit" | "blocked" | "duck" | "weave" | "sway" | "missed";
+}
+
+function mapCounterReasonToDefense(reason: CounterResolution["reason"]): CounterDefenseType {
+  if (reason === "hit") {
+    return "hit";
+  }
+  if (reason === "blocked") {
+    return "tight_guard";
+  }
+  if (reason === "duck" || reason === "weave" || reason === "sway") {
+    return reason;
+  }
+  return "off_line";
 }
 
 interface CombatDebugTelemetry {
@@ -216,12 +230,19 @@ export class CombatSystem {
   private aiStamina = AI_STAMINA_MAX;
   private successfulHits = 0;
   private guardedCounters = 0;
+  private counterDefenseStats = {
+    tightGuard: 0,
+    duck: 0,
+    weave: 0,
+    sway: 0
+  };
   private lastUpdateTime: number | null = null;
   private threatExpiresAt: number | null = null;
   private counterLaunchAt: number | null = null;
   private counterResolveAt: number | null = null;
   private counterTarget: Vec3 | null = null;
   private lastGuardResult: GuardResult = "none";
+  private lastCounterDefense: CounterDefenseType = "none";
   private dodgeType: DodgeType | null = null;
   private counterState: "idle" | "primed" | "resolved" = "idle";
   private counterMove: CounterMove | null = null;
@@ -356,6 +377,7 @@ export class CombatSystem {
           this.counterTarget = resolveCounterTarget(userPose);
           this.counterState = "primed";
           this.lastGuardResult = "none";
+          this.lastCounterDefense = "none";
           this.attackResolved = true;
           this.statusText = `AI ${this.dodgeType.replace("_", " ")} dodged and is loading a counter`;
           triggerDodge = this.dodgeType;
@@ -396,6 +418,7 @@ export class CombatSystem {
       const resolution = resolveCounterResult(userPose, this.counterTarget);
       const guardResult = resolution.result;
       this.lastGuardResult = guardResult;
+      this.lastCounterDefense = mapCounterReasonToDefense(resolution.reason);
       this.counterState = "resolved";
       this.counterResolveAt = null;
       this.counterTarget = null;
@@ -404,6 +427,15 @@ export class CombatSystem {
         this.statusText = `${this.counterMove?.replace("_", " ") ?? "counter"} found your face`;
       } else {
         this.guardedCounters += 1;
+        if (resolution.reason === "blocked") {
+          this.counterDefenseStats.tightGuard += 1;
+        } else if (resolution.reason === "duck") {
+          this.counterDefenseStats.duck += 1;
+        } else if (resolution.reason === "weave") {
+          this.counterDefenseStats.weave += 1;
+        } else if (resolution.reason === "sway") {
+          this.counterDefenseStats.sway += 1;
+        }
         const counterLabel = this.counterMove?.replace("_", " ") ?? "counter";
         if (resolution.reason === "blocked") {
           this.statusText = `${counterLabel} was blocked by a tight guard`;
@@ -440,6 +472,7 @@ export class CombatSystem {
       aiStamina: this.aiStamina,
       successfulHits: this.successfulHits,
       guardedCounters: this.guardedCounters,
+      counterDefenseStats: { ...this.counterDefenseStats },
       tracking,
       modelMode,
       activeThreat: {
@@ -449,6 +482,7 @@ export class CombatSystem {
         expiresAt: this.threatExpiresAt
       },
       lastGuardResult: this.lastGuardResult,
+      lastCounterDefense: this.lastCounterDefense,
       counterState: this.counterState,
       counterMove: this.counterMove,
       statusText: this.statusText,
@@ -461,6 +495,7 @@ export class CombatSystem {
     this.aiHp = Math.max(this.aiHp - damage, 0);
     this.successfulHits += 1;
     this.lastGuardResult = "none";
+    this.lastCounterDefense = "none";
     if (this.aiHp === 0) {
       this.statusText = "Victory. AI is down";
       this.threatExpiresAt = null;

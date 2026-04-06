@@ -9,6 +9,10 @@ export function createAppShell(container: HTMLElement): {
   aiHpValue: HTMLSpanElement;
   successfulHitsValue: HTMLSpanElement;
   guardedCountersValue: HTMLSpanElement;
+  tightGuardDefenseValue: HTMLSpanElement;
+  duckDefenseValue: HTMLSpanElement;
+  weaveDefenseValue: HTMLSpanElement;
+  swayDefenseValue: HTMLSpanElement;
   trackingValue: HTMLSpanElement;
   stateValue: HTMLSpanElement;
   probabilityValue: HTMLSpanElement;
@@ -43,6 +47,10 @@ export function createAppShell(container: HTMLElement): {
           <p class="eyebrow">Combat Stats</p>
           <div class="metric-row"><span>Successful Hits</span><strong data-role="successful-hits">0</strong></div>
           <div class="metric-row"><span>Defended Counters</span><strong data-role="guarded-counters">0</strong></div>
+          <div class="metric-row"><span>Tight Guard</span><strong data-role="defense-tight-guard">0</strong></div>
+          <div class="metric-row"><span>Duck</span><strong data-role="defense-duck">0</strong></div>
+          <div class="metric-row"><span>Weave</span><strong data-role="defense-weave">0</strong></div>
+          <div class="metric-row"><span>Sway</span><strong data-role="defense-sway">0</strong></div>
         </div>
         <div class="hud-panel ai-health-panel">
           <div class="ai-health-header">
@@ -112,6 +120,10 @@ export function createAppShell(container: HTMLElement): {
   const aiHpValue = container.querySelector<HTMLSpanElement>("[data-role='ai-hp-value']");
   const successfulHitsValue = container.querySelector<HTMLSpanElement>("[data-role='successful-hits']");
   const guardedCountersValue = container.querySelector<HTMLSpanElement>("[data-role='guarded-counters']");
+  const tightGuardDefenseValue = container.querySelector<HTMLSpanElement>("[data-role='defense-tight-guard']");
+  const duckDefenseValue = container.querySelector<HTMLSpanElement>("[data-role='defense-duck']");
+  const weaveDefenseValue = container.querySelector<HTMLSpanElement>("[data-role='defense-weave']");
+  const swayDefenseValue = container.querySelector<HTMLSpanElement>("[data-role='defense-sway']");
   const trackingValue = container.querySelector<HTMLSpanElement>("[data-role='tracking']");
   const stateValue = container.querySelector<HTMLSpanElement>("[data-role='state']");
   const probabilityValue = container.querySelector<HTMLSpanElement>("[data-role='probability']");
@@ -145,6 +157,10 @@ export function createAppShell(container: HTMLElement): {
     !aiHpValue ||
     !successfulHitsValue ||
     !guardedCountersValue ||
+    !tightGuardDefenseValue ||
+    !duckDefenseValue ||
+    !weaveDefenseValue ||
+    !swayDefenseValue ||
     !trackingValue ||
     !stateValue ||
     !probabilityValue ||
@@ -181,6 +197,10 @@ export function createAppShell(container: HTMLElement): {
     aiHpValue,
     successfulHitsValue,
     guardedCountersValue,
+    tightGuardDefenseValue,
+    duckDefenseValue,
+    weaveDefenseValue,
+    swayDefenseValue,
     trackingValue,
     stateValue,
     probabilityValue,

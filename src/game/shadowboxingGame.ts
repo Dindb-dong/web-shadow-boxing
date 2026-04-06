@@ -51,6 +51,12 @@ export class ShadowboxingGame {
     aiStamina: 100,
     successfulHits: 0,
     guardedCounters: 0,
+    counterDefenseStats: {
+      tightGuard: 0,
+      duck: 0,
+      weave: 0,
+      sway: 0
+    },
     tracking: false,
     modelMode: "real",
     activeThreat: {
@@ -60,6 +66,7 @@ export class ShadowboxingGame {
       expiresAt: null
     },
     lastGuardResult: "none",
+    lastCounterDefense: "none",
     counterState: "idle",
     counterMove: null,
     statusText: "Preparing camera permissions",

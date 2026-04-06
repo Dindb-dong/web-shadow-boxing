@@ -4,7 +4,7 @@ Date: 2026-04-06
 
 ## Current Summary
 
-Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우저 클라이언트로 동작하며, 현재는 `사용자 MediaPipe 포즈 오버레이`, `실제 리깅된 Titan Boxer GLB 아바타`, `좌/우 위빙 및 좌/우 더킹 기반 복싱 카운터 패턴`을 유지한 채 공격 판정/궤도 계산을 `/Users/maxkim/boxer_ai` 파이프라인 기준으로 교체했다. 브라우저에서는 MediaPipe Pose를 `20 FPS`로 상시 실행하고, `pose_world_landmarks`의 `어깨/팔꿈치/손목 6개 관절 xyz`를 사용해 boxer_ai와 동일하게 `어깨 중심 이동 + 어깨 거리 정규화 + EMA smoothing(beta=0.3) + 위치/속도/가속도 54차 feature + 최근 12-step window`를 만든다. 기존 `MockPredictor`와 `AttackDetector`는 제거했고, 대신 boxer_ai의 실제 GRU 체크포인트(`checkpoints/gru_model.pt`)를 브라우저용 JSON 가중치로 export해 TypeScript 단일-layer GRU 런타임에서 직접 추론한다. 공격 판정과 trajectory emit은 모두 `attacking_prob >= 0.3` 기준으로 맞췄고, AI 회피 판정은 이제 world `z` 깊이보다 화면상 `XY` 경로를 우선해 예측된 1~6 step 손목 궤적 전체를 피하도록 계산한다. HP가 0이 되면 즉시 다운 모션을 재생한다. 이번 세션에서는 기존 가짜 sleeve arm overlay를 버리고, 외부에서 받은 `characters3d.com - Titan Boxer.glb`의 실제 humanoid skeleton(`Shoulder/Upper_Arm/Lower_Arm/Hand`)을 직접 구동하도록 바꿔 기본 가드와 카운터 주먹 뻗기가 아바타 본과 동기화되게 만들었다. MediaPipe task model도 원격 경로 대신 로컬 `public/assets/pose_landmarker_full.task`를 사용하도록 바꿨다.
+Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우저 클라이언트로 동작하며, 현재는 `사용자 MediaPipe 포즈 오버레이`, `실제 리깅된 Titan Boxer GLB 아바타`, `좌/우 위빙 및 좌/우 더킹 기반 복싱 카운터 패턴`을 유지한 채 공격 판정/궤도 계산을 `/Users/maxkim/boxer_ai` 파이프라인 기준으로 교체했다. 브라우저에서는 MediaPipe Pose를 `20 FPS`로 상시 실행하고, `pose_world_landmarks`의 `어깨/팔꿈치/손목 6개 관절 xyz`를 사용해 boxer_ai와 동일하게 `어깨 중심 이동 + 어깨 거리 정규화 + EMA smoothing(beta=0.3) + 위치/속도/가속도 54차 feature + 최근 12-step window`를 만든다. 기존 `MockPredictor`와 `AttackDetector`는 제거했고, 대신 boxer_ai의 실제 GRU 체크포인트(`checkpoints/gru_model.pt`)를 브라우저용 JSON 가중치로 export해 TypeScript 단일-layer GRU 런타임에서 직접 추론한다. 공격 판정과 trajectory emit은 모두 `attacking_prob >= 0.5` 기준으로 맞췄고, AI 회피 판정은 이제 world `z` 깊이보다 화면상 `XY` 경로를 우선해 예측된 1~6 step 손목 궤적 전체를 피하도록 계산한다. HP가 0이 되면 즉시 다운 모션을 재생한다. 이번 세션에서는 기존 가짜 sleeve arm overlay를 버리고, 외부에서 받은 `characters3d.com - Titan Boxer.glb`의 실제 humanoid skeleton(`Shoulder/Upper_Arm/Lower_Arm/Hand`)을 직접 구동하도록 바꿔 기본 가드와 카운터 주먹 뻗기가 아바타 본과 동기화되게 만들었다. MediaPipe task model도 원격 경로 대신 로컬 `public/assets/pose_landmarker_full.task`를 사용하도록 바꿨다.
 
 ## Current Behavior
 
@@ -21,10 +21,10 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 11. 회피에 성공한 경우에만 방향과 회피 종류에 맞는 정형화된 카운터 조합을 준비한다. 예를 들면 같은 방향 훅/어퍼 또는 반대손 스트레이트가 교대로 나온다.
 12. counter는 회피 직후 바로 적중 판정을 내는 것이 아니라, 회피 시점의 유저 얼굴 월드 좌표를 저장한 뒤 `0.3초 후`에 먼저 발사한다.
 13. counter 발사 `0.5초 후`에 유저가 그 목표 좌표에 남았는지(피격), 손/팔로 막았는지(block), z축 뒤로 빠졌는지(sway)를 판정한다.
-14. counter 시점에 유저 얼굴 대신 손/팔이 목표 좌표에 있으면 block으로 간주하고, 유저 얼굴이 목표 z보다 더 뒤로 빠져 있으면 sway dodge로 간주한다. 두 경우 모두 `Defended Counters`가 증가한다.
+14. counter 방어 판정은 이제 느슨한 팔/어깨 proximity 대신 `코 바로 앞 tight wrist guard`, `충분한 duck`, `충분한 weave`, 또는 `충분한 sway back`만 인정한다. 이 네 방식은 모두 `Defended Counters`로 집계되고, 그렇지 않으면 얼굴 피격으로 처리된다.
 15. AI HP는 유저 주먹 예측 궤도가 AI `avatar hitbox`에 닿고, 그 공격에서 dodge에 실패했거나 dodge 분기로 들어가지 못했을 때 감소한다. 예전 `face-only overlap` 의존은 제거했다. HP가 `0`이 되면 추가 회피/카운터 진입 없이 즉시 `Victory. AI is down` 상태로 고정된다.
 16. AI가 counter를 준비 중인 `primed` 상태에서는 회피가 비활성화되며, 유저가 이 타이밍에 적중 공격을 넣으면 일반 적중보다 더 큰 피해를 주고 counter를 끊을 수 있다.
-17. HUD에는 상단 중앙 AI HP, player HP, AI stamina, 추적 상태, 모델 상태, 공격 확률, 가드 결과가 표시된다. 추가로 Debug HUD에서 `raw threat`, `raw attacking prob`, `last emit raw prob`, `left/right wrist visibility`, `prediction gated`, `combat overlap`, `dodge chance/roll`, `attackStarted edge`, 최근 이벤트 로그를 바로 볼 수 있다.
+17. HUD에는 상단 중앙 AI HP, player HP, AI stamina, 추적 상태, 모델 상태, 공격 확률, 가드 결과가 표시된다. 우측 상단 `Combat Stats` 카드에는 `Successful Hits`, `Defended Counters`와 함께 counter 방어 방식을 누적으로 분해한 `Tight Guard`, `Duck`, `Weave`, `Sway` 카운트가 함께 표시된다. 추가로 Debug HUD에서 `raw threat`, `raw attacking prob`, `last emit raw prob`, `left/right wrist visibility`, `prediction gated`, `combat overlap`, `dodge chance/roll`, `attackStarted edge`, 최근 이벤트 로그를 바로 볼 수 있다.
 18. HUD 우측 상단에는 현재 게임 버전과 함께 `Successful Hits`, `Defended Counters` 누적 수치가 항상 보인다.
 19. 빨간 링 로프 토러스는 제거했고, 현재 무대는 어두운 플랫폼 중심으로만 보인다.
 20. AI 반격용 빨간 글러브는 이제 기본 상태에서도 항상 얼굴 앞 가드 위치에 보이며, 위치 계산은 가짜 overlay arm이 아니라 실제 `L/R Shoulder, Upper Arm, Lower Arm, Hand` 본 움직임과 동기화된다.
@@ -80,11 +80,12 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 추가 내회전 보정에서는 upper arm / lower arm에 축방향 inward twist를 넣어 손바닥이 얼굴 쪽을 향하도록 조정했고, hand/finger pose는 과한 claw를 줄이는 쪽으로 다시 다듬었다. 동시에 guard는 더 높게 올리고 전방 bias는 다시 줄여, 기본 자세가 뻗은 자세가 아니라 접힌 복서 가드에 가깝게 보이도록 조정했다. 현재 버전 표기는 `1.3.9`이다.
 - 이번 후속 재보정에서는 손가락 본을 더 강하게 접는 대신 finger scale도 함께 줄여 글러브 안쪽으로 정리되도록 바꿨고, glove mesh는 다시 손보다 앞쪽으로 덮이게 보정했다. 동시에 upper/lower arm inward twist를 더 키워 손바닥이 얼굴 쪽을 더 분명히 향하도록 조정했고, guard 높이/전방 거리도 다시 균형점으로 되돌렸다. 현재 버전 표기는 `1.3.10`이다.
 - 이번 후속 모델 갱신에서는 exporter가 외부 절대경로가 아니라 로컬 `checkpoints/gru_model.pt`를 읽도록 바꿨고, 팀원이 전달한 새 `.pt` 체크포인트를 브라우저용 `src/model/assets/boxerAiWeights.json`으로 다시 export했다. 현재 버전 표기는 `1.3.11`이다.
-- 이번 후속 추론 튜닝에서는 팀원이 전달한 운영 가이드에 맞춰 pose EMA beta를 `0.3`으로 낮추고, 공격/trajectory emit 임계치를 `attacking_prob >= 0.3`으로 통일했다. 동시에 AI 회피 판정은 3D depth 일치보다 예측된 1~6 step 손목 궤적의 `XY` 폴리라인 전체가 아바타 실루엣을 지나는지 기준으로 바꿨고, 이에 대한 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.12`이다.
+- 이번 후속 추론 튜닝에서는 팀원이 전달한 운영 가이드에 맞춰 pose EMA beta를 `0.3`으로 낮추고, 공격/trajectory emit 임계치를 운영상 `attacking_prob >= 0.5`로 올려 정적 자세나 가벼운 흔들림에서 `attacking` 오탐이 덜 뜨도록 조정했다. 동시에 AI 회피 판정은 3D depth 일치보다 예측된 1~6 step 손목 궤적의 `XY` 폴리라인 전체가 아바타 실루엣을 지나는지 기준으로 바꿨고, 이에 대한 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.12`이다.
 - 이번 후속 전투 상태머신 수정에서는 낮아진 공격 임계치 때문에 predictor 출력이 연속 `attacking`으로 유지될 때 AI가 첫 회피 이후 `dodgeType/counterState=resolved/attackActive`에 묶여 다시 회피하지 못하던 버그를 고쳤다. 이제 한 펀치 윈도우가 끝나면 같은 threatening 스트림 안에서도 상태를 재무장해 다음 펀치를 새 공격으로 다시 처리하고, 이 케이스를 고정하는 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.13`이다.
 - 이번 후속 밸런스/방어 판정 수정에서는 AI dodge 스태미나 소모를 `18 -> 4`로 낮춰 연속 회피 여력을 크게 늘렸다. 동시에 AI counter 방어 판정은 느슨한 팔/어깨 proximity를 제거하고, `proper sway`, `충분한 duck`, `충분한 weave`, 또는 `코 바로 앞 tight wrist guard`만 defended로 인정하도록 조였다. 이에 따라 대충 손을 target 근처에 두는 정도로는 guarded 처리되지 않고, strict counter-defense 회귀 테스트를 추가했다. 현재 버전 표기는 `1.3.14`이다.
 - 이번 후속 trajectory 보정에서는 팀원이 준 GRU raw traj는 그대로 두고 `trajectoryToWorld()`에서 wide arc를 후처리했다. 양손 공통으로 wide hook 성격이 감지되면 초반 step의 x를 화면 측면 lane 쪽으로 넓히고, 말단 step은 다시 중앙 lane 쪽으로 당겨 `화면 끝 -> 중앙`으로 들어오는 궤적이 되도록 조정했다. 좌/우 대칭 회귀 테스트를 추가했고, 이후 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
 - 이번 후속 trajectory 렌더 정리에서는 predictor의 `left/right wrist pair`는 combat 판정에 그대로 유지하되, 화면 trail은 더 공격적인 손목 path 하나만 선택해서 그리도록 바꿨다. 덕분에 한 펀치에 붉은 궤도가 두 줄 동시에 뜨지 않고, 실제로 더 많이 전진한 손 하나만 시각화된다. 이 변경 후에도 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 다시 통과했다.
+- 이번 후속 HUD/통계 보강에서는 combat snapshot에 counter 방어 방식별 누적 카운트(`tight guard`, `duck`, `weave`, `sway`)를 올리고, 우측 상단 `Combat Stats` 카드에서 그 숫자를 바로 보이도록 정리했다. 이제 마지막 방식 1개 대신 실제로 어떤 방어/회피를 몇 번 했는지가 누적으로 보인다. 이 변경 후에도 `docker compose run --rm app npm run test:run -- tests/game/combatSystem.test.ts tests/ui/shell.test.ts`, `docker compose run --rm app npm run build`를 통과했다.
 
 ## Current Limitations
 

@@ -1,6 +1,7 @@
 export type StateName = "idle" | "attacking";
 export type DodgeType = "left_weave" | "right_weave" | "left_duck" | "right_duck";
 export type GuardResult = "guarded" | "hit" | "none";
+export type CounterDefenseType = "none" | "hit" | "tight_guard" | "duck" | "weave" | "sway" | "off_line";
 export type ModelMode = "mock" | "real";
 export type CounterMove =
   | "left_hook"
@@ -88,16 +89,25 @@ export interface ThreatSnapshot {
   expiresAt: number | null;
 }
 
+export interface CounterDefenseStats {
+  tightGuard: number;
+  duck: number;
+  weave: number;
+  sway: number;
+}
+
 export interface CombatSnapshot {
   aiHp: number;
   playerHp: number;
   aiStamina: number;
   successfulHits: number;
   guardedCounters: number;
+  counterDefenseStats: CounterDefenseStats;
   tracking: boolean;
   modelMode: ModelMode;
   activeThreat: ThreatSnapshot;
   lastGuardResult: GuardResult;
+  lastCounterDefense: CounterDefenseType;
   counterState: "idle" | "primed" | "resolved";
   counterMove: CounterMove | null;
   statusText: string;
