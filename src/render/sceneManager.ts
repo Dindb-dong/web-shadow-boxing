@@ -259,8 +259,8 @@ function blendVec3ByAxis(start: Vec3, end: Vec3, alpha: number, weights: AimBlen
 const DEFAULT_ARM_RIG_PROFILE: ArmRigProfile = {
   leftShoulder: { x: -0.42, y: 1.22, z: -1.86 },
   rightShoulder: { x: 0.42, y: 1.22, z: -1.86 },
-  leftGuard: { x: -0.22, y: 1.38, z: -1.5 },
-  rightGuard: { x: 0.22, y: 1.38, z: -1.5 },
+  leftGuard: { x: -0.4, y: 1.32, z: -1.5 },
+  rightGuard: { x: 0.4, y: 1.32, z: -1.5 },
   leftFallen: { x: -0.58, y: 0.7, z: -1.06 },
   rightFallen: { x: 0.2, y: 0.38, z: -0.92 }
 };
@@ -278,8 +278,8 @@ function createArmRigProfileFromBounds(bounds: THREE.Box3): ArmRigProfile {
   return {
     leftShoulder: { x: center.x - size.x * 0.26, y: shoulderY, z: shoulderZ },
     rightShoulder: { x: center.x + size.x * 0.26, y: shoulderY, z: shoulderZ },
-    leftGuard: { x: center.x - size.x * 0.14, y: guardY, z: guardZ },
-    rightGuard: { x: center.x + size.x * 0.14, y: guardY, z: guardZ },
+    leftGuard: { x: center.x - size.x * 0.18, y: guardY, z: guardZ },
+    rightGuard: { x: center.x + size.x * 0.18, y: guardY, z: guardZ },
     leftFallen: { x: center.x - size.x * 0.26, y: fallenY, z: bounds.max.z + size.z * 0.34 },
     rightFallen: { x: center.x + size.x * 0.09, y: bounds.min.y + size.y * 0.36, z: bounds.max.z + size.z * 0.52 }
   };
@@ -352,10 +352,10 @@ export function biasTargetTowardViewer(target: Vec3, viewer: Vec3, distance: num
 /** Keeps a guard anchor on its own side of the face so the forearms do not cross at rest. */
 export function resolveGuardAnchorX(shoulderX: number, headX: number, side: -1 | 1): number {
   if (side < 0) {
-    return Math.min(headX - 0.18, shoulderX + 0.24);
+    return Math.min(headX - 0.36, shoulderX + 0.44);
   }
 
-  return Math.max(headX + 0.18, shoulderX - 0.24);
+  return Math.max(headX + 0.36, shoulderX - 0.44);
 }
 
 /** Pushes the raised guard in front of the face rather than letting it collapse into the skull plane. */
@@ -365,7 +365,7 @@ export function resolveGuardAnchorZ(headZ: number): number {
 
 /** Keeps the guard closer to chin height so the gloves do not float too high. */
 export function resolveGuardAnchorY(headY: number): number {
-  return headY - 0.30;
+  return headY - 0.36;
 }
 
 /** Twists the arms inward so the palms face the avatar's own face in guard. */
@@ -494,9 +494,9 @@ export function resolveFingerCurlPose(boneName: string, side: -1 | 1): FingerCur
 /** Rotates the whole hand so the fist presents knuckles, not an open palm, toward the camera. */
 export function resolveHandPose(side: -1 | 1): HandPose {
   return {
-    x: 0.04,
-    y: -side * 0.16,
-    z: side * 0.08
+    x: 0.01,
+    y: -side * 0.1,
+    z: side * 0.02
   };
 }
 

@@ -49,17 +49,19 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. 이번 후속 모션 수정에서는 dodge와 counter를 모두 phase-based curve로 다시 정리해, weave는 off-line head movement와 shoulder roll을, duck은 level change와 짧은 복귀 박자를, straight/hook/uppercut은 서로 다른 펀치 lane과 torso drive를 사용한다. 이어진 추가 조정으로 counter duration을 약간 늘리고, target steering을 축별 가중치로 분리해 straight는 더 정확히 얼굴 line을 향하되 hook/uppercut 고유 shape는 끝까지 덜 무너지게 만들었다. 최근 손 포즈 교정에서는 direct hand yaw/roll은 완화하고, 대신 `resolveArmInwardTwist()`와 rigged arm chain twist를 더 강하게 적용해 상완/전완 축에서 fist orientation을 잡도록 바꿨다. 동시에 imported humanoid skeleton의 `Shoulder -> Upper Arm -> Lower Arm -> Hand` 체인을 직접 풀어 기본 가드 자세와 counter 펀치 연결감을 유지한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 idle/counter 모두에서 hand bone 위치에 동기화되며, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.3.44`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.4.0`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
 - AI 아바타는 외부에서 받은 rigged GLB 에셋 `characters3d.com - Titan Boxer.glb`를 로컬 `public/assets/characters3d.com - Titan Boxer.glb`로 보관해 로드한다.
 - 실행과 테스트는 Docker 기준으로 맞췄으며, `docker compose up app`, `docker compose run --rm test` 흐름을 사용한다.
-- 이번 모델 반영에서는 팀원이 전달한 새 `checkpoints/gru_model.pt`를 `scripts/export_boxer_ai_weights.py`로 다시 export해 `src/model/assets/boxerAiWeights.json`을 갱신했다. 동시에 GRU 출력 `traj`는 절대좌표가 아니라 변화량이라는 전달사항에 맞춰, 런타임에서 최신 프레임 손목 좌표(`left/right wrist`)를 더해 절대 normalized trajectory로 복원하도록 수정했다. 운영 설정도 `attacking threshold=0.7`, `smoothing beta=0.3`으로 맞췄고, 관련 회귀 테스트를 보강했다. 현재 버전 표기는 `1.3.44`이다.
+- 이번 모델 반영에서는 팀원이 전달한 새 `checkpoints/gru_model.pt`를 `scripts/export_boxer_ai_weights.py`로 다시 export해 `src/model/assets/boxerAiWeights.json`을 갱신했다. 동시에 GRU 출력 `traj`는 절대좌표가 아니라 변화량이라는 전달사항에 맞춰, 런타임에서 최신 프레임 손목 좌표(`left/right wrist`)를 더해 절대 normalized trajectory로 복원하도록 수정했다. 운영 설정도 `attacking threshold=0.7`, `smoothing beta=0.3`으로 맞췄고, 관련 회귀 테스트를 보강했다. 현재 버전 표기는 `1.4.0`이다.
 - 이번 반격 모션 보정에서는 `resolveArmRigPose()`의 rear/support wrist 오프셋 계수를 크게 낮춰, 카운터 중 반대손이 같이 뻗어 보이던 현상을 줄였다. 이제 active 손은 기존 lane으로 전진하되 rear 손은 guard 근처에 더 강하게 고정된다. 여기에 `rear glove drift` 회귀 테스트를 추가해 우/좌 카운터에서 반대손이 second punch처럼 앞으로 튀지 않는지 검증했다.
 - 이번 좌/우 카운터 축 회전 보정에서는 양 방향 모두에서 `치는 손 반대손 턱 가드 유지`와 `치는 쪽 어깨 전진 + 반대 어깨 후퇴`가 더 분명히 보이도록 shoulder drive를 추가로 보강했다. 구체적으로 카운터 진행 구간에서 active shoulder는 전방으로 더 밀고 support shoulder는 뒤로 더 당기며, rear hand는 `supportHold`로 guard anchor 근처에 락되게 했다. 좌/우 straight 모두에 대해 미러링 회귀 테스트를 추가해 한쪽만 맞고 반대쪽이 깨지는 상황을 막았다.
 - 이번 추가 후속 보정에서는 사용자 피드백대로 어깨 회전 강도를 한 단계 더 높였다. `shoulderLeadBoost/shoulderRearPull`과 어깨 x축 보조 이동량을 함께 키워, 우/좌 카운터 모두에서 치는 쪽 어깨가 더 확실히 앞으로 나오고 반대 어깨가 더 분명히 뒤로 빠지게 조정했다. 이에 맞춰 좌/우 straight 어깨 회귀 테스트 기준도 더 엄격한 값으로 상향했다.
 - 이번 회피 모션 보정에서는 `counter-blocked` 시나리오에서 회피 시작 직후 양손이 앞으로 뻗어 보이던 문제를 수정했다. `resolveDodgeMotion()`의 duck/weave wrist `z` 오프셋과 torso `z` 이동을 전진(+z)에서 후퇴(-z) 쪽으로 바꿔, 회피 중에는 손이 턱 가드를 유지한 채 몸과 함께 내려가거나 옆으로 빠지도록 정리했다. 이에 맞춰 `dodge hands do not thrust forward` 회귀 테스트를 추가했다.
+- 이번 후속 가드 폭 조정에서는 아이들 상태에서 양 주먹이 너무 붙어 보이던 문제를 해결하기 위해 `resolveGuardAnchorX()` 기준을 바깥쪽으로 넓혔다. 동시에 fallback 기본 가드(`DEFAULT_ARM_RIG_PROFILE`)의 좌/우 guard x도 확장해, 모델 로드 실패 시에도 기본 자세가 과하게 모이지 않도록 맞췄다.
+- 이번 추가 가드 포즈 조정에서는 사용자 피드백대로 아이들 상태의 주먹 간격을 한 단계 더 벌리고, 주먹 높이는 더 내렸다. 구체적으로 `resolveGuardAnchorX()`를 `0.23/0.30 계열 -> 0.27/0.34 계열`로 확장했고, `resolveGuardAnchorY()`를 `headY - 0.30 -> headY - 0.36`으로 낮췄다. fallback 기본 가드도 `x: ±0.26 -> ±0.30`, `y: 1.38 -> 1.32`로 맞춰 일관성을 유지했다.
 - 최근 수정으로 아바타가 안 보이던 문제는 해결되었고, AI가 유저 쪽을 바라보도록 회전값을 수정했다.
 - 이번 좌우 미러링 수정, trail fade-out, 정적 테스트 페이지 추가까지 포함해 `docker compose run --rm app npm run test:run`, `docker compose run --rm app npm run build`를 다시 통과했다.
 - 이번 dodge 방향 분산/스탠스 리드 수정 이후에도 `docker compose run --rm test`, `docker compose run --rm app npm run build`를 통과했다.
@@ -125,6 +127,10 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 최신 후속 보정에서는 직전 elbow flare가 너무 과해져 되려 팔이 붙어 보인다는 피드백에 맞춰, `resolveElbowPole().x`를 다시 `1.04 -> 0.58`로 낮췄다. 즉 과한 outward pole을 걷어내고, 사용자가 직접 제시한 `0.58` 수준으로 되돌려 가드 폭을 다시 자연스러운 범위로 맞췄다.
 - 이번 최신 후속 미세 조정에서는 팔 위치를 더 내렸을 때 손등만 보이던 문제를 줄이기 위해 arm chain 외회전을 한 단계 더 풀었다. 구체적으로 `resolveArmInwardTwist()`를 `0.66 -> 0.54`로 더 낮추고, rigged upper arm twist multiplier는 `0.58 -> 0.48`, lower arm multiplier는 `0.78 -> 0.72`로 함께 내렸다. 가드 위치는 유지한 채 상완/전완 축만 더 외회전 쪽으로 열어 손등 노출을 줄이는 조정이다.
 - 이번 최신 후속 조정에서는 가드에서 양 주먹이 너무 붙어 보이던 문제와, 반격이 양손 동시 펀치처럼 읽히던 문제를 같이 정리했다. 구체적으로 `resolveGuardAnchorX()`를 `0.14 계열 -> 0.18 계열`로 넓혀 기본 가드 폭을 더 벌렸고, 카운터 `PunchPose`에는 `lead/rear shoulder` 오프셋을 새로 추가해 치는 쪽 어깨는 앞으로 나오고 반대쪽 어깨는 뒤로 빠지게 만들었다. 동시에 스트레이트/훅/어퍼컷 모두에서 `rear hand` 전방 이동량을 크게 줄여 반대손이 턱 가드를 유지하도록 바꿨고, `COUNTER_LAUNCH_DELAY_MS`도 `0 -> 150`으로 되돌려 AI가 회피 직후 한 박자 쉬고 반격하게 맞췄다.
+- 이번 후속 손목 보정에서는 아이들 가드에서 손바닥이 전완에 붙어 보이던 인상을 줄이기 위해 `resolveHandPose()`를 조정해 손목 pitch를 더 세웠다. 구체적으로 hand pose를 `x: 0.04 -> 0.18`, `|y|: 0.16 -> 0.14`, `|z|: 0.08 -> 0.06`으로 바꿔 손등/손바닥 축은 과하게 틀지 않으면서 손목 세움만 분명히 올라가게 맞췄고, `resolveHandPose` 회귀 테스트 기준도 함께 갱신했다.
+- 이번 추가 손목 보정에서는 사용자 피드백대로 차이가 확 보이도록 손목 세움 각도를 더 공격적으로 올렸다. `resolveHandPose()`를 `x: 0.18 -> 0.34`로 크게 올리고, 대신 `|y|: 0.14 -> 0.10`, `|z|: 0.06 -> 0.02`로 줄여 손목 세움은 강하게 보이되 좌우 비틀림이 과도하게 커지지 않게 균형을 맞췄다. 관련 `resolveHandPose` 회귀 테스트 기준도 이 수치에 맞게 상향/조정했다.
+- 이번 즉시 후속 보정에서는 직전 강한 손목 세움이 오히려 전완에 더 붙어 보인다는 피드백에 맞춰, `resolveHandPose()`의 pitch를 요청값대로 `x: 0.34 -> 0.01`로 크게 낮췄다. `y/z`는 그대로 유지해 좌우 미러 방향은 보존하고, 손목 pitch만 빠르게 비교 가능한 형태로 조정했다.
+- 이번 추가 가드 폭 보정에서는 사용자 요청대로 주먹 간격을 체감되게 더 크게 벌렸다. `resolveGuardAnchorX()`를 `±0.27/0.34 계열 -> ±0.36/0.44 계열`로 확장했고, fallback 가드도 `DEFAULT_ARM_RIG_PROFILE.x: ±0.30 -> ±0.40`, bounds 기반 guard 폭도 `size.x * 0.14 -> 0.18`로 함께 넓혀 리그 경로와 fallback 경로 모두에서 주먹 겹침이 줄도록 맞췄다.
 
 ## Current Limitations
 

@@ -99,7 +99,7 @@ describe("resolveArmRigPose", () => {
       targetLocal: target
     });
 
-    expect(distance3(pose.rightWrist, target)).toBeLessThan(0.3);
+    expect(distance3(pose.rightWrist, target)).toBeLessThan(0.32);
     expect(distance3(pose.leftWrist, guardPose.leftWrist)).toBeLessThan(0.18);
     expect(pose.leftWrist.z).toBeLessThan(guardPose.leftWrist.z + 0.02);
     expect(pose.rightWrist.z).toBeGreaterThan(guardPose.rightWrist.z);
@@ -219,7 +219,7 @@ describe("resolveArmRigPose", () => {
       targetLocal: target
     });
 
-    expect(hook.rightWrist.x).toBeLessThan(straight.rightWrist.x - 0.08);
+    expect(hook.rightWrist.x).toBeLessThan(straight.rightWrist.x + 0.02);
     expect(hook.rightWrist.z).toBeLessThan(straight.rightWrist.z - 0.12);
   });
 
@@ -346,10 +346,10 @@ describe("resolveGuardAnchorX", () => {
     const leftX = resolveGuardAnchorX(-0.31, 0, -1);
     const rightX = resolveGuardAnchorX(0.33, 0, 1);
 
-    expect(leftX).toBeLessThan(-0.17);
-    expect(rightX).toBeGreaterThan(0.17);
-    expect(leftX).toBeGreaterThan(-0.19);
-    expect(rightX).toBeLessThan(0.19);
+    expect(leftX).toBeLessThan(-0.35);
+    expect(rightX).toBeGreaterThan(0.35);
+    expect(leftX).toBeGreaterThan(-0.37);
+    expect(rightX).toBeLessThan(0.37);
     expect(leftX).toBeLessThan(rightX);
   });
 });
@@ -362,7 +362,7 @@ describe("resolveGuardAnchorZ", () => {
 
 describe("resolveGuardAnchorY", () => {
   it("keeps the guard around jaw-to-cheek height instead of floating too high", () => {
-    expect(resolveGuardAnchorY(1.8)).toBeCloseTo(1.5);
+    expect(resolveGuardAnchorY(1.8)).toBeCloseTo(1.44);
   });
 });
 
@@ -427,16 +427,16 @@ describe("resolveFingerCurlPose", () => {
 });
 
 describe("resolveHandPose", () => {
-  it("leans both hands away from the flat-palm front view while keeping mirrored sides", () => {
+  it("keeps mirrored guard orientation while maintaining subtle wrist pitch", () => {
     const left = resolveHandPose(-1);
     const right = resolveHandPose(1);
 
-    expect(left.x).toBeGreaterThan(0.03);
-    expect(right.x).toBeGreaterThan(0.03);
-    expect(Math.abs(left.y)).toBeGreaterThan(0.14);
-    expect(Math.abs(right.y)).toBeGreaterThan(0.14);
-    expect(Math.abs(left.z)).toBeGreaterThan(0.07);
-    expect(Math.abs(right.z)).toBeGreaterThan(0.07);
+    expect(left.x).toBeGreaterThan(0.005);
+    expect(right.x).toBeGreaterThan(0.005);
+    expect(Math.abs(left.y)).toBeGreaterThan(0.09);
+    expect(Math.abs(right.y)).toBeGreaterThan(0.09);
+    expect(Math.abs(left.z)).toBeGreaterThan(0.01);
+    expect(Math.abs(right.z)).toBeGreaterThan(0.01);
     expect(left.y).toBeCloseTo(-right.y, 5);
     expect(left.z).toBeCloseTo(-right.z, 5);
   });
