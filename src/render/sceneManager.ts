@@ -475,9 +475,9 @@ export function resolveFingerCurlPose(boneName: string, side: -1 | 1): FingerCur
     // The Titan Boxer thumb reads best when it curls sideways across the fist,
     // not when it points upward or drops straight down.
     return {
-      x: isProximal ? 0.8 : isIntermediate ? 0.58 : 0.34,
-      y: side * (isProximal ? -0.12 : isIntermediate ? -0.16 : -0.02),
-      z: side * (isProximal ? -0.56 : isIntermediate ? -0.46 : -0.1),
+      x: isProximal ? -0.8 : isIntermediate ? 0.58 : 0.34,
+      y: side * (isProximal ? 0.12 : isIntermediate ? -0.16 : -0.02),
+      z: side * (isProximal ? 0.56 : isIntermediate ? -0.46 : -0.1),
       scale: isProximal ? 0.84 : isIntermediate ? 0.88 : 0.93
     };
   }

@@ -392,12 +392,14 @@ describe("resolveElbowPole", () => {
 });
 
 describe("resolveFingerCurlPose", () => {
-  it("folds the thumb sideways across the fist instead of pointing it upward", () => {
+  it("flips the thumb proximal joint so it no longer bends in the opposite direction", () => {
     const thumbProximal = resolveFingerCurlPose("L_Thumb_Proximal", -1);
     const thumbIntermediate = resolveFingerCurlPose("L_Thumb_Intermediate", -1);
     const thumbDistal = resolveFingerCurlPose("L_Thumb_Distal", -1);
 
-    expect(thumbProximal.x).toBeGreaterThan(0.75);
+    expect(thumbProximal.x).toBeLessThan(-0.75);
+    expect(thumbProximal.y).toBeLessThan(0);
+    expect(thumbProximal.z).toBeLessThan(0);
     expect(Math.abs(thumbProximal.y)).toBeLessThan(0.16);
     expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.5);
     expect(Math.abs(thumbProximal.z)).toBeGreaterThan(Math.abs(thumbProximal.y));
