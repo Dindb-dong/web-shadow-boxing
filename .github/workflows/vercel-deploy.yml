@@ -1,0 +1,111 @@
+name: Vercel Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  preview-deploy:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check Vercel secrets
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ secrets.VERCEL_ORG_ID }}" ] && [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip deploy (missing Vercel secrets)
+        if: steps.check-secrets.outputs.enabled != 'true'
+        run: echo "Skipping preview deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
+
+      - name: Install dependencies
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: npm ci
+
+      - name: Install Vercel CLI
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel preview environment
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Vercel preview artifact
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Vercel preview
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+
+  production-deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check Vercel secrets
+        id: check-secrets
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ secrets.VERCEL_ORG_ID }}" ] && [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip deploy (missing Vercel secrets)
+        if: steps.check-secrets.outputs.enabled != 'true'
+        run: echo "Skipping production deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
+
+      - name: Install dependencies
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: npm ci
+
+      - name: Install Vercel CLI
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel production environment
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Vercel production artifact
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Vercel production
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
