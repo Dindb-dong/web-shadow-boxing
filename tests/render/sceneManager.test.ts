@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   biasTargetTowardViewer,
+  resolveHandPose,
   resolveRenderableThreatPath,
   resolveElbowPole,
   resolveFingerCurlPose,
@@ -48,6 +49,26 @@ describe("resolveArmRigPose", () => {
     expect(pose.rightWrist.x).toBeGreaterThan(0);
   });
 
+  it("sends weave dodges farther off the center line while duck dodges change level more aggressively", () => {
+    const leftWeave = resolveArmRigPose({
+      ...BASE_INPUTS,
+      dodgeType: "left_weave",
+      dodgeProgress: 0.52
+    });
+    const leftDuck = resolveArmRigPose({
+      ...BASE_INPUTS,
+      dodgeType: "left_duck",
+      dodgeProgress: 0.52
+    });
+    const weaveAverageY = (leftWeave.leftWrist.y + leftWeave.rightWrist.y) / 2;
+    const duckAverageY = (leftDuck.leftWrist.y + leftDuck.rightWrist.y) / 2;
+
+    expect(leftWeave.leftWrist.x).toBeLessThan(leftDuck.leftWrist.x - 0.02);
+    expect(duckAverageY).toBeLessThan(weaveAverageY - 0.08);
+    expect(leftWeave.leftWrist.z).toBeGreaterThan(leftDuck.leftWrist.z - 0.02);
+    expect(leftDuck.leftWrist.y).toBeLessThan(leftWeave.leftWrist.y);
+  });
+
   it("pushes the active glove toward the counter target while the rear hand stays guarding", () => {
     const guardPose = resolveArmRigPose(BASE_INPUTS);
     const target = { x: 0.02, y: 2.02, z: -0.86 };
@@ -60,8 +81,94 @@ describe("resolveArmRigPose", () => {
 
     expect(distance3(pose.rightWrist, target)).toBeLessThan(0.3);
     expect(distance3(pose.leftWrist, guardPose.leftWrist)).toBeLessThan(0.18);
+    expect(pose.leftWrist.z).toBeLessThan(guardPose.leftWrist.z + 0.02);
     expect(pose.rightWrist.z).toBeGreaterThan(guardPose.rightWrist.z);
     expect(pose.rightElbow.z).toBeGreaterThan(guardPose.rightElbow.z);
+  });
+
+  it("drives the punching shoulder forward while the support shoulder stays back on a straight counter", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const pose = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.62
+    });
+
+    expect(pose.rightShoulder.z).toBeGreaterThan(guardPose.rightShoulder.z + 0.08);
+    expect(pose.leftShoulder.z).toBeLessThan(guardPose.leftShoulder.z - 0.03);
+    expect(pose.leftWrist.z).toBeLessThan(guardPose.leftWrist.z + 0.02);
+  });
+
+  it("gives straights, hooks, and uppercuts distinct counter lanes", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const straight = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.5
+    });
+    const hook = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_hook",
+      counterProgress: 0.5
+    });
+    const uppercut = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_uppercut",
+      counterProgress: 0.5
+    });
+
+    expect(straight.rightWrist.x).toBeLessThan(guardPose.rightWrist.x);
+    expect(hook.rightWrist.x).toBeLessThan(straight.rightWrist.x);
+    expect(straight.rightWrist.z).toBeGreaterThan(hook.rightWrist.z);
+    expect(uppercut.rightWrist.y).toBeGreaterThan(hook.rightWrist.y);
+    expect(uppercut.rightWrist.y).toBeGreaterThan(straight.rightWrist.y);
+  });
+
+  it("keeps a readable load, release, and recovery during a straight counter", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const loadPose = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.2
+    });
+    const impactPose = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.62
+    });
+    const recoveryPose = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.9
+    });
+
+    expect(loadPose.rightWrist.x).toBeGreaterThan(guardPose.rightWrist.x);
+    expect(loadPose.rightWrist.z).toBeGreaterThan(guardPose.rightWrist.z);
+    expect(impactPose.rightWrist.x).toBeLessThan(loadPose.rightWrist.x - 0.16);
+    expect(impactPose.rightWrist.z).toBeGreaterThan(loadPose.rightWrist.z + 0.42);
+    expect(recoveryPose.rightWrist.z).toBeLessThan(impactPose.rightWrist.z - 0.12);
+    expect(Math.abs(recoveryPose.rightWrist.x - guardPose.rightWrist.x)).toBeLessThan(
+      Math.abs(impactPose.rightWrist.x - guardPose.rightWrist.x)
+    );
+  });
+
+  it("preserves hook shape even when a counter target is present", () => {
+    const target = { x: 0.01, y: 1.95, z: -0.94 };
+    const straight = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.62,
+      targetLocal: target
+    });
+    const hook = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_hook",
+      counterProgress: 0.62,
+      targetLocal: target
+    });
+
+    expect(hook.rightWrist.x).toBeLessThan(straight.rightWrist.x - 0.08);
+    expect(hook.rightWrist.z).toBeLessThan(straight.rightWrist.z - 0.12);
   });
 
   it("drops both gloves when the avatar enters the downed state", () => {
@@ -162,42 +269,48 @@ describe("resolveGuardAnchorX", () => {
     const leftX = resolveGuardAnchorX(-0.31, 0, -1);
     const rightX = resolveGuardAnchorX(0.33, 0, 1);
 
-    expect(leftX).toBeLessThan(-0.23);
-    expect(rightX).toBeGreaterThan(0.23);
+    expect(leftX).toBeLessThan(-0.17);
+    expect(rightX).toBeGreaterThan(0.17);
+    expect(leftX).toBeGreaterThan(-0.19);
+    expect(rightX).toBeLessThan(0.19);
     expect(leftX).toBeLessThan(rightX);
   });
 });
 
 describe("resolveGuardAnchorZ", () => {
   it("keeps the raised guard slightly in front of the head plane", () => {
-    expect(resolveGuardAnchorZ(-1.95)).toBeCloseTo(-1.87);
+    expect(resolveGuardAnchorZ(-1.95)).toBeCloseTo(-1.73);
   });
 });
 
 describe("resolveGuardAnchorY", () => {
-  it("keeps the guard near eyebrow height instead of dropping toward the chest", () => {
-    expect(resolveGuardAnchorY(1.8)).toBeCloseTo(1.9);
+  it("keeps the guard around jaw-to-cheek height instead of floating too high", () => {
+    expect(resolveGuardAnchorY(1.8)).toBeCloseTo(1.5);
   });
 });
 
 describe("resolveArmInwardTwist", () => {
   it("twists left and right arms inward toward the face with opposite signs", () => {
-    expect(resolveArmInwardTwist(-1)).toBeCloseTo(1.08);
-    expect(resolveArmInwardTwist(1)).toBeCloseTo(-1.08);
+    expect(resolveArmInwardTwist(-1)).toBeCloseTo(0.34);
+    expect(resolveArmInwardTwist(1)).toBeCloseTo(-0.34);
   });
 });
 
 describe("resolveElbowPole", () => {
-  it("keeps both elbow poles tucked instead of flaring wide", () => {
+  it("keeps both elbow poles slightly flared while still staying compact", () => {
     const leftPole = resolveElbowPole(-1);
     const rightPole = resolveElbowPole(1);
 
     expect(leftPole.x).toBeLessThan(0);
     expect(rightPole.x).toBeGreaterThan(0);
-    expect(Math.abs(leftPole.x)).toBeLessThan(0.3);
-    expect(Math.abs(rightPole.x)).toBeLessThan(0.3);
-    expect(leftPole.y).toBeLessThan(-0.8);
-    expect(rightPole.y).toBeLessThan(-0.8);
+    expect(Math.abs(leftPole.x)).toBeGreaterThan(0.56);
+    expect(Math.abs(rightPole.x)).toBeGreaterThan(0.56);
+    expect(Math.abs(leftPole.x)).toBeLessThan(0.6);
+    expect(Math.abs(rightPole.x)).toBeLessThan(0.6);
+    expect(leftPole.y).toBeLessThan(-1.3);
+    expect(rightPole.y).toBeLessThan(-1.3);
+    expect(leftPole.z).toBeGreaterThan(0.18);
+    expect(rightPole.z).toBeGreaterThan(0.18);
   });
 });
 
@@ -208,13 +321,13 @@ describe("resolveFingerCurlPose", () => {
     const thumbDistal = resolveFingerCurlPose("L_Thumb_Distal", -1);
 
     expect(thumbProximal.x).toBeGreaterThan(0.75);
-    expect(Math.abs(thumbProximal.y)).toBeLessThan(0.3);
-    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.6);
+    expect(Math.abs(thumbProximal.y)).toBeLessThan(0.16);
+    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.5);
     expect(Math.abs(thumbProximal.z)).toBeGreaterThan(Math.abs(thumbProximal.y));
-    expect(Math.abs(thumbIntermediate.y)).toBeGreaterThan(0.25);
-    expect(Math.abs(thumbIntermediate.z)).toBeGreaterThan(0.5);
-    expect(Math.abs(thumbDistal.y)).toBeLessThan(0.01);
-    expect(Math.abs(thumbDistal.z)).toBeLessThan(0.15);
+    expect(Math.abs(thumbIntermediate.y)).toBeGreaterThan(0.12);
+    expect(Math.abs(thumbIntermediate.z)).toBeGreaterThan(0.42);
+    expect(Math.abs(thumbDistal.y)).toBeLessThan(0.03);
+    expect(Math.abs(thumbDistal.z)).toBeGreaterThan(0.08);
     expect(thumbDistal.scale).toBeLessThan(0.95);
   });
 
@@ -233,5 +346,21 @@ describe("resolveFingerCurlPose", () => {
     const pinkyProximal = resolveFingerCurlPose("R_Pinky_Proximal", 1);
 
     expect(littleProximal).toEqual(pinkyProximal);
+  });
+});
+
+describe("resolveHandPose", () => {
+  it("leans both hands away from the flat-palm front view while keeping mirrored sides", () => {
+    const left = resolveHandPose(-1);
+    const right = resolveHandPose(1);
+
+    expect(left.x).toBeGreaterThan(0.03);
+    expect(right.x).toBeGreaterThan(0.03);
+    expect(Math.abs(left.y)).toBeGreaterThan(0.14);
+    expect(Math.abs(right.y)).toBeGreaterThan(0.14);
+    expect(Math.abs(left.z)).toBeGreaterThan(0.07);
+    expect(Math.abs(right.z)).toBeGreaterThan(0.07);
+    expect(left.y).toBeCloseTo(-right.y, 5);
+    expect(left.z).toBeCloseTo(-right.z, 5);
   });
 });

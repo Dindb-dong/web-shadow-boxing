@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DODGE_DURATION_MS, TRAJECTORY_DISPLAY_MS } from "../game/constants";
 import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory, WristTrajectory } from "../types/game";
 
-const COUNTER_ANIMATION_MS = 460;
+const COUNTER_ANIMATION_MS = 540;
 const VICTORY_ANIMATION_MS = 1100;
 const THREAT_SEGMENT_POOL_SIZE = 100;
 const THREAT_SEGMENT_RADIUS = 0.045;
@@ -17,11 +17,33 @@ interface PunchPose {
   rearX: number;
   rearY: number;
   rearZ: number;
+  leadShoulderX: number;
+  leadShoulderY: number;
+  leadShoulderZ: number;
+  rearShoulderX: number;
+  rearShoulderY: number;
+  rearShoulderZ: number;
   torsoYaw: number;
   torsoRoll: number;
   torsoPitch: number;
   torsoDriveX: number;
   torsoDriveY: number;
+  torsoDriveZ: number;
+}
+
+interface DodgeMotion {
+  leftWristOffset: Vec3;
+  rightWristOffset: Vec3;
+  rootPosition: Vec3;
+  rootRotation: Vec3;
+  torsoPosition: Vec3;
+  torsoRotation: Vec3;
+}
+
+interface AimBlendWeights {
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface ArmRigPose {
@@ -112,11 +134,36 @@ function clamp01(value: number): number {
   return THREE.MathUtils.clamp(value, 0, 1);
 }
 
+/** Returns a single 0-1-0 pulse with a configurable peak point. */
+function resolvePulse(progress: number, peakAt = 0.5): number {
+  const clamped = clamp01(progress);
+  if (clamped <= peakAt) {
+    return easeInOutSine(clamped / Math.max(peakAt, 1e-4));
+  }
+
+  return 1 - easeInOutSine((clamped - peakAt) / Math.max(1 - peakAt, 1e-4));
+}
+
+/** Returns a smooth ramp that stays flat, then rises toward the end of the motion. */
+function resolveLateRise(progress: number, startAt: number): number {
+  if (progress <= startAt) {
+    return 0;
+  }
+
+  return easeInOutSine(clamp01((progress - startAt) / Math.max(1 - startAt, 1e-4)));
+}
+
 export interface FingerCurlPose {
   x: number;
   y: number;
   z: number;
   scale: number;
+}
+
+export interface HandPose {
+  x: number;
+  y: number;
+  z: number;
 }
 
 /** Scores one wrist path so rendering can prefer the hand that actually threw the punch. */
@@ -172,6 +219,15 @@ function offsetVec3(source: Vec3, offset: Partial<Vec3>): Vec3 {
     x: source.x + (offset.x ?? 0),
     y: source.y + (offset.y ?? 0),
     z: source.z + (offset.z ?? 0)
+  };
+}
+
+/** Blends each axis independently so punch shape survives target steering. */
+function blendVec3ByAxis(start: Vec3, end: Vec3, alpha: number, weights: AimBlendWeights): Vec3 {
+  return {
+    x: THREE.MathUtils.lerp(start.x, end.x, alpha * weights.x),
+    y: THREE.MathUtils.lerp(start.y, end.y, alpha * weights.y),
+    z: THREE.MathUtils.lerp(start.z, end.z, alpha * weights.z)
   };
 }
 
@@ -271,33 +327,33 @@ export function biasTargetTowardViewer(target: Vec3, viewer: Vec3, distance: num
 /** Keeps a guard anchor on its own side of the face so the forearms do not cross at rest. */
 export function resolveGuardAnchorX(shoulderX: number, headX: number, side: -1 | 1): number {
   if (side < 0) {
-    return Math.min(headX - 0.24, shoulderX + 0.08);
+    return Math.min(headX - 0.18, shoulderX + 0.24);
   }
 
-  return Math.max(headX + 0.24, shoulderX - 0.08);
+  return Math.max(headX + 0.18, shoulderX - 0.24);
 }
 
 /** Pushes the raised guard in front of the face rather than letting it collapse into the skull plane. */
 export function resolveGuardAnchorZ(headZ: number): number {
-  return headZ + 0.08;
+  return headZ + 0.22;
 }
 
-/** Keeps the guard near eyebrow height so the boxer does not reach forward at chest level. */
+/** Keeps the guard closer to chin height so the gloves do not float too high. */
 export function resolveGuardAnchorY(headY: number): number {
-  return headY + 0.1;
+  return headY - 0.30;
 }
 
 /** Twists the arms inward so the palms face the avatar's own face in guard. */
 export function resolveArmInwardTwist(side: -1 | 1): number {
-  return -side * 1.08;
+  return -side * 0.34;
 }
 
-/** Returns a tucked elbow pole so the boxer silhouette stays compact instead of winging outward. */
+/** Returns a lowered elbow pole so the guard reads wide at the elbows but tight at the fists. */
 export function resolveElbowPole(side: -1 | 1): Vec3 {
   return {
-    x: side * 0.26,
-    y: -0.92,
-    z: 0.08
+    x: side * 0.58,
+    y: -1.38,
+    z: 0.2
   };
 }
 
@@ -394,19 +450,28 @@ export function resolveFingerCurlPose(boneName: string, side: -1 | 1): FingerCur
     // The Titan Boxer thumb reads best when it curls sideways across the fist,
     // not when it points upward or drops straight down.
     return {
-      x: isProximal ? 0.82 : isIntermediate ? 0.6 : 0.4,
-      y: side * (isProximal ? -0.24 : isIntermediate ? -0.28 : 0),
-      z: side * (isProximal ? -0.66 : isIntermediate ? -0.58 : -0.1),
-      scale: isProximal ? 0.84 : isIntermediate ? 0.89 : 0.94
+      x: isProximal ? 0.8 : isIntermediate ? 0.58 : 0.34,
+      y: side * (isProximal ? -0.12 : isIntermediate ? -0.16 : -0.02),
+      z: side * (isProximal ? -0.56 : isIntermediate ? -0.46 : -0.1),
+      scale: isProximal ? 0.84 : isIntermediate ? 0.88 : 0.93
     };
   }
 
-  const baseX = isPinky ? (isProximal ? 1.8 : isIntermediate ? 1.5 : 1.22) : isProximal ? 1.34 : isIntermediate ? 1.08 : 0.86;
+  const baseX = isPinky ? (isProximal ? 1.82 : isIntermediate ? 1.52 : 1.24) : isProximal ? 1.38 : isIntermediate ? 1.1 : 0.88;
   return {
     x: baseX,
     y: isPinky ? side * 0.12 : 0,
     z: isPinky ? side * -0.34 : 0,
     scale: isPinky ? 0.72 : 0.82
+  };
+}
+
+/** Rotates the whole hand so the fist presents knuckles, not an open palm, toward the camera. */
+export function resolveHandPose(side: -1 | 1): HandPose {
+  return {
+    x: 0.04,
+    y: -side * 0.16,
+    z: side * 0.08
   };
 }
 
@@ -426,92 +491,213 @@ export function resolveElbowJoint(shoulder: Vec3, wrist: Vec3, side: -1 | 1, col
   };
 }
 
+/** Returns the body and glove motion used by each dodge family. */
+function resolveDodgeMotion(type: DodgeType, progress: number): DodgeMotion {
+  const side = resolveDodgeSide(type);
+  const normalized = clamp01(progress);
+  const isDuck = type.endsWith("duck");
+  const offLine = resolvePulse(normalized, isDuck ? 0.44 : 0.5);
+  const returnBeat = resolveLateRise(normalized, isDuck ? 0.48 : 0.58);
+
+  if (isDuck) {
+    const outsideHand = {
+      x: side * 0.052 * offLine,
+      y: -0.13 * offLine,
+      z: 0.065 * offLine
+    };
+    const insideHand = {
+      x: side * 0.016 * offLine,
+      y: -0.085 * offLine,
+      z: 0.05 * offLine
+    };
+
+    return {
+      leftWristOffset: side < 0 ? outsideHand : insideHand,
+      rightWristOffset: side > 0 ? outsideHand : insideHand,
+      rootPosition: {
+        x: side * 0.19 * offLine,
+        y: -0.33 * offLine,
+        z: -0.085 * offLine + 0.028 * returnBeat
+      },
+      rootRotation: {
+        x: 0.12 * offLine,
+        y: side * 0.08 * offLine,
+        z: side * 0.09 * offLine
+      },
+      torsoPosition: {
+        x: side * 0.045 * offLine,
+        y: -0.02 * offLine,
+        z: 0.026 * offLine
+      },
+      torsoRotation: {
+        x: 0.065 * offLine,
+        y: -side * 0.22 * offLine,
+        z: -side * 0.11 * offLine
+      }
+    };
+  }
+
+  const outsideHand = {
+    x: side * 0.085 * offLine,
+    y: -0.02 * offLine,
+    z: 0.055 * offLine
+  };
+  const insideHand = {
+    x: side * 0.03 * offLine,
+    y: -0.012 * offLine,
+    z: 0.04 * offLine
+  };
+
+  return {
+    leftWristOffset: side < 0 ? outsideHand : insideHand,
+    rightWristOffset: side > 0 ? outsideHand : insideHand,
+    rootPosition: {
+      x: side * 0.32 * offLine,
+      y: -0.085 * offLine,
+      z: -0.035 * offLine + 0.018 * returnBeat
+    },
+    rootRotation: {
+      x: 0.03 * offLine,
+      y: side * 0.1 * offLine,
+      z: side * 0.24 * offLine
+    },
+    torsoPosition: {
+      x: side * 0.08 * offLine,
+      y: 0,
+      z: 0.022 * offLine
+    },
+    torsoRotation: {
+      x: -0.01 * offLine,
+      y: -side * 0.34 * offLine,
+      z: -side * 0.14 * offLine
+    }
+  };
+}
+
 /** Returns the active punch pose for the requested counter animation frame. */
 function resolvePunchPose(move: CounterMove, progress: number): PunchPose {
   const side = move.startsWith("left") ? -1 : 1;
-  const windupProgress = progress < 0.28 ? easeInOutSine(progress / 0.28) : progress < 0.5 ? 1 - easeInOutSine((progress - 0.28) / 0.22) : 0;
-  const strikeProgress =
-    progress < 0.22 ? 0 : progress < 0.6 ? easeInOutSine((progress - 0.22) / 0.38) : 1 - easeInOutSine((progress - 0.6) / 0.4);
+  const normalized = clamp01(progress);
+  const loadProgress =
+    normalized < 0.24
+      ? easeInOutSine(normalized / 0.24)
+      : normalized < 0.48
+        ? 1 - easeInOutSine((normalized - 0.24) / 0.24)
+        : 0;
+  const driveProgress =
+    normalized < 0.22
+      ? 0
+      : normalized < 0.64
+        ? easeInOutSine((normalized - 0.22) / 0.42)
+        : 1 - easeInOutSine((normalized - 0.64) / 0.36);
+  const recoveryProgress = resolveLateRise(normalized, 0.68);
 
   if (move.endsWith("straight")) {
     return {
-      leadX: side * (0.09 * strikeProgress - 0.1 * windupProgress),
-      leadY: 0.02 * strikeProgress + 0.03 * windupProgress,
-      leadZ: -0.92 * strikeProgress + 0.14 * windupProgress,
-      rearX: side * 0.05 * strikeProgress,
-      rearY: 0.04 * windupProgress,
-      rearZ: -0.08 * windupProgress,
-      torsoYaw: -side * (0.26 * strikeProgress - 0.12 * windupProgress),
-      torsoRoll: -side * 0.08 * strikeProgress,
-      torsoPitch: 0.04 * strikeProgress,
-      torsoDriveX: side * 0.04 * strikeProgress,
-      torsoDriveY: 0.02 * strikeProgress
+      leadX: side * 0.11 * loadProgress - side * 0.26 * driveProgress + side * 0.05 * recoveryProgress,
+      leadY: -0.03 * loadProgress + 0.025 * driveProgress - 0.02 * recoveryProgress,
+      leadZ: 0.08 * loadProgress + 0.92 * driveProgress - 0.34 * recoveryProgress,
+      rearX: side * 0.012 * loadProgress + side * 0.05 * driveProgress - side * 0.01 * recoveryProgress,
+      rearY: 0.018 * loadProgress + 0.012 * driveProgress,
+      rearZ: -0.01 * loadProgress - 0.045 * driveProgress + 0.018 * recoveryProgress,
+      leadShoulderX: -side * (0.018 * loadProgress + 0.05 * driveProgress - 0.018 * recoveryProgress),
+      leadShoulderY: 0.01 * loadProgress + 0.018 * driveProgress - 0.006 * recoveryProgress,
+      leadShoulderZ: 0.03 * loadProgress + 0.16 * driveProgress - 0.05 * recoveryProgress,
+      rearShoulderX: -side * (0.01 * loadProgress + 0.024 * driveProgress - 0.008 * recoveryProgress),
+      rearShoulderY: -0.004 * driveProgress,
+      rearShoulderZ: -0.012 * loadProgress - 0.06 * driveProgress + 0.02 * recoveryProgress,
+      torsoYaw: -side * (0.26 * loadProgress + 0.7 * driveProgress - 0.24 * recoveryProgress),
+      torsoRoll: -side * (0.05 * loadProgress + 0.16 * driveProgress - 0.04 * recoveryProgress),
+      torsoPitch: -0.03 * loadProgress + 0.07 * driveProgress - 0.028 * recoveryProgress,
+      torsoDriveX: side * 0.05 * loadProgress - side * 0.11 * driveProgress + side * 0.034 * recoveryProgress,
+      torsoDriveY: -0.015 * loadProgress + 0.025 * driveProgress - 0.01 * recoveryProgress,
+      torsoDriveZ: 0.08 * loadProgress + 0.22 * driveProgress - 0.07 * recoveryProgress
     };
   }
 
   if (move.endsWith("hook")) {
     return {
-      leadX: -side * (0.34 * strikeProgress) - side * 0.08 * windupProgress,
-      leadY: 0.06 * strikeProgress,
-      leadZ: -0.56 * strikeProgress + 0.1 * windupProgress,
-      rearX: side * 0.06 * windupProgress,
-      rearY: 0.02 * windupProgress,
-      rearZ: -0.06 * windupProgress,
-      torsoYaw: -side * (0.38 * strikeProgress - 0.08 * windupProgress),
-      torsoRoll: -side * 0.18 * strikeProgress,
-      torsoPitch: 0.02 * strikeProgress,
-      torsoDriveX: side * 0.07 * strikeProgress,
-      torsoDriveY: 0.015 * strikeProgress
+      leadX: side * 0.14 * loadProgress - side * 0.34 * driveProgress + side * 0.12 * recoveryProgress,
+      leadY: 0.035 * loadProgress + 0.09 * driveProgress - 0.045 * recoveryProgress,
+      leadZ: 0.03 * loadProgress + 0.34 * driveProgress - 0.13 * recoveryProgress,
+      rearX: side * 0.018 * loadProgress + side * 0.04 * driveProgress - side * 0.012 * recoveryProgress,
+      rearY: 0.02 * loadProgress + 0.012 * driveProgress,
+      rearZ: -0.015 * loadProgress - 0.03 * driveProgress + 0.015 * recoveryProgress,
+      leadShoulderX: -side * (0.015 * loadProgress + 0.04 * driveProgress - 0.014 * recoveryProgress),
+      leadShoulderY: 0.012 * driveProgress,
+      leadShoulderZ: 0.02 * loadProgress + 0.11 * driveProgress - 0.04 * recoveryProgress,
+      rearShoulderX: -side * (0.01 * loadProgress + 0.02 * driveProgress - 0.007 * recoveryProgress),
+      rearShoulderY: -0.006 * driveProgress,
+      rearShoulderZ: -0.01 * loadProgress - 0.045 * driveProgress + 0.016 * recoveryProgress,
+      torsoYaw: -side * (0.36 * loadProgress + 0.78 * driveProgress - 0.25 * recoveryProgress),
+      torsoRoll: -side * (0.14 * loadProgress + 0.22 * driveProgress - 0.08 * recoveryProgress),
+      torsoPitch: -0.01 * loadProgress + 0.022 * driveProgress - 0.008 * recoveryProgress,
+      torsoDriveX: side * 0.035 * loadProgress - side * 0.12 * driveProgress + side * 0.04 * recoveryProgress,
+      torsoDriveY: -0.006 * loadProgress + 0.018 * driveProgress - 0.008 * recoveryProgress,
+      torsoDriveZ: 0.02 * loadProgress + 0.07 * driveProgress - 0.028 * recoveryProgress
     };
   }
 
   return {
-    leadX: -side * 0.08 * windupProgress + side * 0.06 * strikeProgress,
-    leadY: 0.32 * strikeProgress - 0.08 * windupProgress,
-    leadZ: -0.66 * strikeProgress + 0.1 * windupProgress,
-    rearX: side * 0.05 * windupProgress,
-    rearY: 0.04 * windupProgress,
-    rearZ: -0.05 * windupProgress,
-    torsoYaw: -side * (0.18 * strikeProgress - 0.08 * windupProgress),
-    torsoRoll: -side * 0.12 * strikeProgress,
-    torsoPitch: -0.06 * windupProgress + 0.07 * strikeProgress,
-    torsoDriveX: side * 0.03 * strikeProgress,
-    torsoDriveY: 0.035 * strikeProgress
+    leadX: side * 0.04 * loadProgress - side * 0.12 * driveProgress + side * 0.04 * recoveryProgress,
+    leadY: -0.11 * loadProgress + 0.38 * driveProgress - 0.09 * recoveryProgress,
+    leadZ: 0.02 * loadProgress + 0.4 * driveProgress - 0.15 * recoveryProgress,
+    rearX: side * 0.012 * loadProgress + side * 0.038 * driveProgress - side * 0.012 * recoveryProgress,
+    rearY: 0.018 * loadProgress + 0.012 * driveProgress,
+    rearZ: -0.015 * loadProgress - 0.03 * driveProgress + 0.012 * recoveryProgress,
+    leadShoulderX: -side * (0.012 * loadProgress + 0.03 * driveProgress - 0.012 * recoveryProgress),
+    leadShoulderY: -0.02 * loadProgress + 0.016 * driveProgress - 0.005 * recoveryProgress,
+    leadShoulderZ: 0.012 * loadProgress + 0.1 * driveProgress - 0.035 * recoveryProgress,
+    rearShoulderX: -side * (0.008 * loadProgress + 0.018 * driveProgress - 0.006 * recoveryProgress),
+    rearShoulderY: -0.012 * loadProgress - 0.008 * driveProgress + 0.003 * recoveryProgress,
+    rearShoulderZ: -0.008 * loadProgress - 0.04 * driveProgress + 0.014 * recoveryProgress,
+    torsoYaw: -side * (0.18 * loadProgress + 0.34 * driveProgress - 0.11 * recoveryProgress),
+    torsoRoll: -side * (0.08 * loadProgress + 0.14 * driveProgress - 0.05 * recoveryProgress),
+    torsoPitch: -0.15 * loadProgress + 0.1 * driveProgress - 0.03 * recoveryProgress,
+    torsoDriveX: side * 0.02 * loadProgress - side * 0.06 * driveProgress + side * 0.022 * recoveryProgress,
+    torsoDriveY: -0.07 * loadProgress + 0.085 * driveProgress - 0.025 * recoveryProgress,
+    torsoDriveZ: 0.018 * loadProgress + 0.055 * driveProgress - 0.022 * recoveryProgress
   };
 }
 
 /** Resolves the visible arm rig pose for guard, dodge, counter, and down states. */
 export function resolveArmRigPose(inputs: ArmRigInputs, profile: ArmRigProfile = DEFAULT_ARM_RIG_PROFILE): ArmRigPose {
-  const leftShoulder = { ...profile.leftShoulder };
-  const rightShoulder = { ...profile.rightShoulder };
+  let leftShoulder = { ...profile.leftShoulder };
+  let rightShoulder = { ...profile.rightShoulder };
   let leftWrist = resolveGuardWrist(-1, inputs.idleSwing, inputs.idleDip, profile);
   let rightWrist = resolveGuardWrist(1, inputs.idleSwing, inputs.idleDip, profile);
 
   if (inputs.dodgeType) {
-    const arc = Math.sin(clamp01(inputs.dodgeProgress) * Math.PI);
-    const dodgeSide = resolveDodgeSide(inputs.dodgeType);
-    const duckDepth = inputs.dodgeType.endsWith("duck") ? 1 : 0;
-    const weaveLift = 1 - duckDepth;
-    leftWrist = offsetVec3(leftWrist, {
-      x: dodgeSide * 0.05 * arc,
-      y: -0.1 * duckDepth * arc - 0.015 * weaveLift * arc,
-      z: 0.04 * arc
-    });
-    rightWrist = offsetVec3(rightWrist, {
-      x: dodgeSide * 0.05 * arc,
-      y: -0.1 * duckDepth * arc - 0.015 * weaveLift * arc,
-      z: 0.04 * arc
-    });
+    const dodgeMotion = resolveDodgeMotion(inputs.dodgeType, inputs.dodgeProgress);
+    leftWrist = offsetVec3(leftWrist, dodgeMotion.leftWristOffset);
+    rightWrist = offsetVec3(rightWrist, dodgeMotion.rightWristOffset);
   }
 
   if (inputs.counterMove) {
     const punchPose = resolvePunchPose(inputs.counterMove, clamp01(inputs.counterProgress));
+    const moveKind = inputs.counterMove.endsWith("straight")
+      ? "straight"
+      : inputs.counterMove.endsWith("hook")
+        ? "hook"
+        : "uppercut";
     const targetBlend = inputs.targetLocal
-      ? (inputs.counterProgress < 0.2 ? 0 : clamp01((inputs.counterProgress - 0.2) / 0.45) * 0.86)
+      ? moveKind === "straight"
+        ? (inputs.counterProgress < 0.22 ? 0 : clamp01((inputs.counterProgress - 0.22) / 0.34) * 0.88)
+        : moveKind === "hook"
+          ? (inputs.counterProgress < 0.32 ? 0 : clamp01((inputs.counterProgress - 0.32) / 0.28) * 0.42)
+          : (inputs.counterProgress < 0.28 ? 0 : clamp01((inputs.counterProgress - 0.28) / 0.28) * 0.5)
       : 0;
+    const targetWeights: AimBlendWeights =
+      moveKind === "straight"
+        ? { x: 0.76, y: 0.64, z: 0.92 }
+        : moveKind === "hook"
+          ? { x: 0.24, y: 0.18, z: 0.45 }
+          : { x: 0.18, y: 0.34, z: 0.52 };
     const activeIsLeft = inputs.counterMove.startsWith("left");
     const activeBase = activeIsLeft ? leftWrist : rightWrist;
     const supportBase = activeIsLeft ? rightWrist : leftWrist;
+    const activeShoulderBase = activeIsLeft ? leftShoulder : rightShoulder;
+    const supportShoulderBase = activeIsLeft ? rightShoulder : leftShoulder;
     let activeWrist = offsetVec3(activeBase, {
       x: punchPose.leadX,
       y: punchPose.leadY,
@@ -522,15 +708,29 @@ export function resolveArmRigPose(inputs: ArmRigInputs, profile: ArmRigProfile =
       y: punchPose.rearY,
       z: punchPose.rearZ
     });
+    const activeShoulder = offsetVec3(activeShoulderBase, {
+      x: punchPose.leadShoulderX,
+      y: punchPose.leadShoulderY,
+      z: punchPose.leadShoulderZ
+    });
+    const supportShoulder = offsetVec3(supportShoulderBase, {
+      x: punchPose.rearShoulderX,
+      y: punchPose.rearShoulderY,
+      z: punchPose.rearShoulderZ
+    });
 
     if (inputs.targetLocal) {
-      activeWrist = lerpVec3(activeWrist, inputs.targetLocal, targetBlend);
+      activeWrist = blendVec3ByAxis(activeWrist, inputs.targetLocal, targetBlend, targetWeights);
     }
 
     if (activeIsLeft) {
+      leftShoulder = activeShoulder;
+      rightShoulder = supportShoulder;
       leftWrist = activeWrist;
       rightWrist = supportWrist;
     } else {
+      rightShoulder = activeShoulder;
+      leftShoulder = supportShoulder;
       rightWrist = activeWrist;
       leftWrist = supportWrist;
     }
@@ -864,33 +1064,19 @@ export class SceneManager {
 
     if (this.dodgeState) {
       dodgeProgress = Math.min((now - this.dodgeState.startedAt) / DODGE_DURATION_MS, 1);
-      const arc = Math.sin(dodgeProgress * Math.PI);
-      const dodgeSide = resolveDodgeSide(this.dodgeState.type);
-      const shoulderLeadYaw = -dodgeSide * 0.24 * arc;
-      const shoulderLeadRoll = -dodgeSide * 0.08 * arc;
-
-      if (this.dodgeState.type === "left_weave") {
-        this.avatarGroup.position.x += -0.36 * arc;
-        this.avatarGroup.position.y += -0.08 * arc;
-        this.avatarGroup.rotation.z += -0.2 * arc;
-        this.avatarGroup.rotation.y += -0.14 * arc;
-      } else if (this.dodgeState.type === "right_weave") {
-        this.avatarGroup.position.x += 0.36 * arc;
-        this.avatarGroup.position.y += -0.08 * arc;
-        this.avatarGroup.rotation.z += 0.2 * arc;
-        this.avatarGroup.rotation.y += 0.14 * arc;
-      } else if (this.dodgeState.type === "left_duck") {
-        this.avatarGroup.position.x += -0.18 * arc;
-        this.avatarGroup.position.y += -0.34 * arc;
-        this.avatarGroup.rotation.x += 0.08 * arc;
-      } else {
-        this.avatarGroup.position.x += 0.18 * arc;
-        this.avatarGroup.position.y += -0.34 * arc;
-        this.avatarGroup.rotation.x += 0.08 * arc;
-      }
-      this.avatarVisualGroup.position.x += dodgeSide * 0.06 * arc;
-      this.avatarVisualGroup.rotation.y += shoulderLeadYaw;
-      this.avatarVisualGroup.rotation.z += shoulderLeadRoll;
+      const dodgeMotion = resolveDodgeMotion(this.dodgeState.type, dodgeProgress);
+      this.avatarGroup.position.x += dodgeMotion.rootPosition.x;
+      this.avatarGroup.position.y += dodgeMotion.rootPosition.y;
+      this.avatarGroup.position.z += dodgeMotion.rootPosition.z;
+      this.avatarGroup.rotation.x += dodgeMotion.rootRotation.x;
+      this.avatarGroup.rotation.y += dodgeMotion.rootRotation.y;
+      this.avatarGroup.rotation.z += dodgeMotion.rootRotation.z;
+      this.avatarVisualGroup.position.x += dodgeMotion.torsoPosition.x;
+      this.avatarVisualGroup.position.y += dodgeMotion.torsoPosition.y;
+      this.avatarVisualGroup.position.z += dodgeMotion.torsoPosition.z;
+      this.avatarVisualGroup.rotation.x += dodgeMotion.torsoRotation.x;
+      this.avatarVisualGroup.rotation.y += dodgeMotion.torsoRotation.y;
+      this.avatarVisualGroup.rotation.z += dodgeMotion.torsoRotation.z;
 
       if (dodgeProgress >= 1) {
         this.dodgeState = null;
@@ -911,6 +1097,7 @@ export class SceneManager {
       activeGlove.scale.setScalar(isGuarded ? 1.06 : 1.12);
       this.avatarVisualGroup.position.x += punchPose.torsoDriveX;
       this.avatarVisualGroup.position.y += punchPose.torsoDriveY;
+      this.avatarVisualGroup.position.z += punchPose.torsoDriveZ;
       this.avatarVisualGroup.rotation.x += punchPose.torsoPitch;
       this.avatarVisualGroup.rotation.y += punchPose.torsoYaw;
       this.avatarVisualGroup.rotation.z += punchPose.torsoRoll;
@@ -1072,12 +1259,12 @@ export class SceneManager {
     );
     const elbowWorld = new THREE.Vector3(elbow.x, elbow.y, elbow.z);
     this.orientBoneTowardDirection(chain.upperArm, elbowWorld.clone().sub(upperArmWorld));
-    this.twistBoneAroundAimAxis(chain.upperArm, resolveArmInwardTwist(chain.side) * 0.58);
+    this.twistBoneAroundAimAxis(chain.upperArm, resolveArmInwardTwist(chain.side) * 0.34);
     this.avatarVisualGroup.updateMatrixWorld(true);
 
     const lowerArmWorld = chain.lowerArm.bone.getWorldPosition(new THREE.Vector3());
     this.orientBoneTowardDirection(chain.lowerArm, wristTargetWorld.clone().sub(lowerArmWorld));
-    this.twistBoneAroundAimAxis(chain.lowerArm, resolveArmInwardTwist(chain.side));
+    this.twistBoneAroundAimAxis(chain.lowerArm, resolveArmInwardTwist(chain.side) * 0.6);
     this.avatarVisualGroup.updateMatrixWorld(true);
     this.applyRiggedHandPose(chain);
     this.avatarVisualGroup.updateMatrixWorld(true);
@@ -1085,7 +1272,8 @@ export class SceneManager {
 
   /** Rotates the hand and finger chains into a fist-like boxing guard. */
   private applyRiggedHandPose(chain: ArmBoneChain): void {
-    const handEuler = new THREE.Euler(-0.04, chain.side * 0.42, -chain.side * 0.26, "XYZ");
+    const handPose = resolveHandPose(chain.side);
+    const handEuler = new THREE.Euler(handPose.x, handPose.y, handPose.z, "XYZ");
     chain.hand.bone.quaternion.copy(chain.hand.restQuaternion);
     chain.hand.bone.quaternion.multiply(new THREE.Quaternion().setFromEuler(handEuler));
 
