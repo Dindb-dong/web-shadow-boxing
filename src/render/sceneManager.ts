@@ -1,13 +1,15 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { DODGE_DURATION_MS, TRAJECTORY_DISPLAY_MS } from "../game/constants";
+import { DODGE_DURATION_MS } from "../game/constants";
 import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory, WristTrajectory } from "../types/game";
 
 const COUNTER_ANIMATION_MS = 540;
 const VICTORY_ANIMATION_MS = 1100;
-const THREAT_SEGMENT_POOL_SIZE = 100;
-const THREAT_SEGMENT_RADIUS = 0.045;
-const THREAT_SEGMENT_BASE_OPACITY = 0.72;
+const THREAT_IMPACT_POOL_SIZE = 14;
+const THREAT_IMPACT_DURATION_MS = 320;
+const THREAT_FLASH_BASE_OPACITY = 0.92;
+const THREAT_RING_BASE_OPACITY = 0.82;
+const THREAT_SPARK_BASE_OPACITY = 0.9;
 const FIGHTER_ASSET_PATH = "/assets/characters3d.com - Titan Boxer.glb";
 
 interface PunchPose {
@@ -110,11 +112,23 @@ export interface ArmRigInputs {
   victoryProgress: number | null;
 }
 
-interface ThreatSegmentSlot {
+interface ThreatImpactSpark {
   mesh: THREE.Mesh;
-  material: THREE.MeshStandardMaterial;
+  material: THREE.MeshBasicMaterial;
+  angle: number;
+}
+
+interface ThreatImpactSlot {
+  group: THREE.Group;
+  flash: THREE.Mesh;
+  flashMaterial: THREE.MeshBasicMaterial;
+  ring: THREE.Mesh;
+  ringMaterial: THREE.MeshBasicMaterial;
+  sparks: ThreatImpactSpark[];
   active: boolean;
+  startedAt: number;
   expiresAt: number;
+  spinOffset: number;
 }
 
 interface ArmRigVisual {
@@ -187,6 +201,17 @@ function scoreThreatPath(path: WristTrajectory): number {
 export function resolveRenderableThreatPath(traj: WristPairTrajectory): WristTrajectory {
   const [leftPath, rightPath] = traj;
   return scoreThreatPath(leftPath) >= scoreThreatPath(rightPath) ? leftPath : rightPath;
+}
+
+/** Returns the final contact point for the dominant punch path so impact FX can burst there. */
+export function resolveThreatImpactPoint(traj: WristPairTrajectory): Vec3 {
+  const path = resolveRenderableThreatPath(traj);
+  const impactPoint = path[path.length - 1];
+  return {
+    x: impactPoint.x,
+    y: impactPoint.y,
+    z: impactPoint.z
+  };
 }
 
 /** Converts a dodge type to a signed lateral direction. */
@@ -818,15 +843,10 @@ export class SceneManager {
     new THREE.MeshStandardMaterial({ color: 0xd62839, roughness: 0.38, metalness: 0.05 })
   );
   private readonly threatGroup = new THREE.Group();
-  private readonly threatSegmentGeometry = new THREE.CylinderGeometry(
-    THREAT_SEGMENT_RADIUS,
-    THREAT_SEGMENT_RADIUS,
-    1,
-    12,
-    1,
-    false
-  );
-  private readonly threatSegments: ThreatSegmentSlot[] = [];
+  private readonly threatFlashGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+  private readonly threatRingGeometry = new THREE.TorusGeometry(0.18, 0.032, 10, 36);
+  private readonly threatSparkGeometry = new THREE.PlaneGeometry(0.065, 0.34);
+  private readonly threatImpacts: ThreatImpactSlot[] = [];
   private readonly shadowPlane = new THREE.Mesh(
     new THREE.CircleGeometry(0.78, 32),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22 })
@@ -975,17 +995,14 @@ export class SceneManager {
     this.renderer.setSize(width, height);
   }
 
-  /** Rebuilds the translucent cylinder threat overlay for the latest prediction. */
+  /** Bursts a short impact effect at the final contact point of the dominant predicted punch. */
   setThreatTrajectory(traj: WristPairTrajectory | null, now: number): void {
     if (!traj) {
       return;
     }
 
-    const wristSteps = resolveRenderableThreatPath(traj);
-    const smoothedPath = this.buildSmoothedPath(wristSteps);
-    for (let index = 0; index < smoothedPath.length - 1; index += 1) {
-      this.activateThreatSegment(smoothedPath[index], smoothedPath[index + 1], now + TRAJECTORY_DISPLAY_MS);
-    }
+    const impactPoint = resolveThreatImpactPoint(traj);
+    this.activateThreatImpact(new THREE.Vector3(impactPoint.x, impactPoint.y, impactPoint.z), now);
   }
 
   /** Starts a dodge animation. */
@@ -1011,39 +1028,60 @@ export class SceneManager {
 
   /** Advances scene animation and renders one frame. */
   render(now: number): void {
-    this.updateThreatOpacity(now);
+    this.updateThreatEffects(now);
     this.updateAvatarAnimation(now);
     this.renderer.render(this.scene, this.camera);
   }
 
   /** Releases WebGL resources. */
   dispose(): void {
-    for (const slot of this.threatSegments) {
-      slot.material.dispose();
+    for (const slot of this.threatImpacts) {
+      slot.flashMaterial.dispose();
+      slot.ringMaterial.dispose();
+      for (const spark of slot.sparks) {
+        spark.material.dispose();
+      }
     }
-    this.threatSegmentGeometry.dispose();
+    this.threatFlashGeometry.dispose();
+    this.threatRingGeometry.dispose();
+    this.threatSparkGeometry.dispose();
     this.armUpperGeometry.dispose();
     this.armForeGeometry.dispose();
     this.armJointGeometry.dispose();
     this.renderer.dispose();
   }
 
-  private updateThreatOpacity(now: number): void {
+  private updateThreatEffects(now: number): void {
     let activeCount = 0;
-    for (const slot of this.threatSegments) {
+    for (const slot of this.threatImpacts) {
       if (!slot.active) {
         continue;
       }
 
-      const remaining = Math.max(slot.expiresAt - now, 0) / TRAJECTORY_DISPLAY_MS;
-      if (remaining <= 0) {
+      const progress = clamp01((now - slot.startedAt) / THREAT_IMPACT_DURATION_MS);
+      if (progress >= 1) {
         slot.active = false;
-        slot.mesh.visible = false;
+        slot.group.visible = false;
         continue;
       }
 
       activeCount += 1;
-      slot.material.opacity = THREAT_SEGMENT_BASE_OPACITY * remaining;
+      const fade = 1 - progress;
+      const flashPulse = resolvePulse(Math.min(progress / 0.72, 1), 0.24);
+      slot.group.visible = true;
+      slot.group.quaternion.copy(this.camera.quaternion);
+      slot.group.rotateZ(slot.spinOffset + progress * 0.42);
+      slot.flash.scale.setScalar(0.42 + flashPulse * 1.28);
+      slot.flashMaterial.opacity = THREAT_FLASH_BASE_OPACITY * Math.pow(fade, 1.45);
+      slot.ring.scale.setScalar(0.5 + progress * 1.65);
+      slot.ringMaterial.opacity = THREAT_RING_BASE_OPACITY * Math.pow(fade, 1.2);
+
+      for (const spark of slot.sparks) {
+        const radius = 0.12 + progress * 0.34;
+        spark.mesh.position.set(Math.cos(spark.angle) * radius, Math.sin(spark.angle) * radius, 0);
+        spark.mesh.scale.set(0.55 - progress * 0.18, 0.7 + progress * 1.35, 1);
+        spark.material.opacity = THREAT_SPARK_BASE_OPACITY * Math.pow(fade, 1.65);
+      }
     }
 
     this.threatGroup.visible = activeCount > 0;
@@ -1375,64 +1413,94 @@ export class SceneManager {
     this.rightGlove.position.copy(rightWrist);
   }
 
-  /** Pre-allocates threat meshes so trajectory updates can reuse existing GPU resources. */
+  /** Pre-allocates impact burst meshes so each punch endpoint can flash without new allocations. */
   private bootstrapThreatPool(): void {
-    for (let index = 0; index < THREAT_SEGMENT_POOL_SIZE; index += 1) {
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xff4f4f,
+    for (let index = 0; index < THREAT_IMPACT_POOL_SIZE; index += 1) {
+      const group = new THREE.Group();
+      const flashMaterial = new THREE.MeshBasicMaterial({
+        color: 0xfff1b8,
         transparent: true,
-        opacity: THREAT_SEGMENT_BASE_OPACITY,
-        emissive: 0xaa2222,
-        emissiveIntensity: 0.8
+        opacity: 0,
+        depthWrite: false
       });
-      const mesh = new THREE.Mesh(this.threatSegmentGeometry, material);
-      mesh.visible = false;
-      this.threatGroup.add(mesh);
-      this.threatSegments.push({
-        mesh,
-        material,
+      const flash = new THREE.Mesh(this.threatFlashGeometry, flashMaterial);
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff6a3d,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      });
+      const ring = new THREE.Mesh(this.threatRingGeometry, ringMaterial);
+      const sparks: ThreatImpactSpark[] = [];
+      for (let sparkIndex = 0; sparkIndex < 8; sparkIndex += 1) {
+        const angle = (sparkIndex / 8) * Math.PI * 2;
+        const material = new THREE.MeshBasicMaterial({
+          color: sparkIndex % 2 === 0 ? 0xfff1b8 : 0xff6138,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const mesh = new THREE.Mesh(this.threatSparkGeometry, material);
+        mesh.rotation.z = angle - Math.PI / 2;
+        group.add(mesh);
+        sparks.push({ mesh, material, angle });
+      }
+
+      flash.scale.setScalar(0.01);
+      ring.scale.setScalar(0.01);
+      group.visible = false;
+      group.renderOrder = 8;
+      group.add(ring, flash);
+      this.threatGroup.add(group);
+      this.threatImpacts.push({
+        group,
+        flash,
+        flashMaterial,
+        ring,
+        ringMaterial,
+        sparks,
         active: false,
-        expiresAt: 0
+        startedAt: 0,
+        expiresAt: 0,
+        spinOffset: 0
       });
     }
   }
 
-  /** Activates one pooled segment and assigns start/end transform plus lifetime. */
-  private activateThreatSegment(start: THREE.Vector3, end: THREE.Vector3, expiresAt: number): void {
-    const direction = new THREE.Vector3().subVectors(end, start);
-    const length = direction.length();
-    if (length <= 1e-4) {
-      return;
-    }
-
+  /** Activates one pooled impact burst at the predicted contact point. */
+  private activateThreatImpact(position: THREE.Vector3, now: number): void {
     const slot = this.findReusableThreatSlot();
     slot.active = true;
-    slot.expiresAt = expiresAt;
-    slot.material.opacity = THREAT_SEGMENT_BASE_OPACITY;
-    slot.mesh.visible = true;
-    slot.mesh.position.copy(start).add(end).multiplyScalar(0.5);
-    slot.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-    slot.mesh.scale.set(1, length, 1);
+    slot.startedAt = now;
+    slot.expiresAt = now + THREAT_IMPACT_DURATION_MS;
+    slot.spinOffset = (now * 0.013) % (Math.PI * 2);
+    slot.group.position.copy(position);
+    slot.group.visible = true;
+    slot.flash.scale.setScalar(0.38);
+    slot.ring.scale.setScalar(0.48);
+    slot.flashMaterial.opacity = THREAT_FLASH_BASE_OPACITY;
+    slot.ringMaterial.opacity = THREAT_RING_BASE_OPACITY;
+    for (const spark of slot.sparks) {
+      spark.mesh.position.set(Math.cos(spark.angle) * 0.12, Math.sin(spark.angle) * 0.12, 0);
+      spark.mesh.scale.set(0.55, 0.7, 1);
+      spark.material.opacity = THREAT_SPARK_BASE_OPACITY;
+    }
   }
 
   /** Returns an inactive slot when available, otherwise recycles the oldest active one. */
-  private findReusableThreatSlot(): ThreatSegmentSlot {
-    const inactive = this.threatSegments.find((slot) => !slot.active);
+  private findReusableThreatSlot(): ThreatImpactSlot {
+    const inactive = this.threatImpacts.find((slot) => !slot.active);
     if (inactive) {
       return inactive;
     }
 
-    let oldest = this.threatSegments[0];
-    for (const slot of this.threatSegments) {
+    let oldest = this.threatImpacts[0];
+    for (const slot of this.threatImpacts) {
       if (slot.expiresAt < oldest.expiresAt) {
         oldest = slot;
       }
     }
     return oldest;
-  }
-
-  /** Keeps the rendered threat path identical to the collision path used by combat logic. */
-  private buildSmoothedPath(wristSteps: Vec3[]): THREE.Vector3[] {
-    return wristSteps.map((point) => new THREE.Vector3(point.x, point.y, point.z));
   }
 }
