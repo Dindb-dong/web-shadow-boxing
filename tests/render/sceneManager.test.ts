@@ -70,6 +70,25 @@ describe("resolveArmRigPose", () => {
     expect(leftDuck.leftWrist.y).toBeLessThan(leftWeave.leftWrist.y);
   });
 
+  it("keeps dodge hands from thrusting forward like a punch", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const leftDuck = resolveArmRigPose({
+      ...BASE_INPUTS,
+      dodgeType: "left_duck",
+      dodgeProgress: 0.56
+    });
+    const rightWeave = resolveArmRigPose({
+      ...BASE_INPUTS,
+      dodgeType: "right_weave",
+      dodgeProgress: 0.56
+    });
+
+    expect(leftDuck.leftWrist.z).toBeLessThanOrEqual(guardPose.leftWrist.z + 0.005);
+    expect(leftDuck.rightWrist.z).toBeLessThanOrEqual(guardPose.rightWrist.z + 0.005);
+    expect(rightWeave.leftWrist.z).toBeLessThanOrEqual(guardPose.leftWrist.z + 0.005);
+    expect(rightWeave.rightWrist.z).toBeLessThanOrEqual(guardPose.rightWrist.z + 0.005);
+  });
+
   it("pushes the active glove toward the counter target while the rear hand stays guarding", () => {
     const guardPose = resolveArmRigPose(BASE_INPUTS);
     const target = { x: 0.02, y: 2.02, z: -0.86 };
@@ -87,6 +106,25 @@ describe("resolveArmRigPose", () => {
     expect(pose.rightElbow.z).toBeGreaterThan(guardPose.rightElbow.z);
   });
 
+  it("does not let the rear glove drift into a second punch lane during counters", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const rightCounter = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "right_straight",
+      counterProgress: 0.64
+    });
+    const leftCounter = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "left_hook",
+      counterProgress: 0.64
+    });
+
+    expect(distance3(rightCounter.leftWrist, guardPose.leftWrist)).toBeLessThan(0.08);
+    expect(rightCounter.leftWrist.z).toBeLessThanOrEqual(guardPose.leftWrist.z + 0.01);
+    expect(distance3(leftCounter.rightWrist, guardPose.rightWrist)).toBeLessThan(0.08);
+    expect(leftCounter.rightWrist.z).toBeLessThanOrEqual(guardPose.rightWrist.z + 0.01);
+  });
+
   it("drives the punching shoulder forward while the support shoulder stays back on a straight counter", () => {
     const guardPose = resolveArmRigPose(BASE_INPUTS);
     const pose = resolveArmRigPose({
@@ -95,9 +133,22 @@ describe("resolveArmRigPose", () => {
       counterProgress: 0.62
     });
 
-    expect(pose.rightShoulder.z).toBeGreaterThan(guardPose.rightShoulder.z + 0.08);
-    expect(pose.leftShoulder.z).toBeLessThan(guardPose.leftShoulder.z - 0.03);
+    expect(pose.rightShoulder.z).toBeGreaterThan(guardPose.rightShoulder.z + 0.12);
+    expect(pose.leftShoulder.z).toBeLessThan(guardPose.leftShoulder.z - 0.06);
     expect(pose.leftWrist.z).toBeLessThan(guardPose.leftWrist.z + 0.02);
+  });
+
+  it("mirrors shoulder rotation correctly on left straights", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const pose = resolveArmRigPose({
+      ...BASE_INPUTS,
+      counterMove: "left_straight",
+      counterProgress: 0.62
+    });
+
+    expect(pose.leftShoulder.z).toBeGreaterThan(guardPose.leftShoulder.z + 0.12);
+    expect(pose.rightShoulder.z).toBeLessThan(guardPose.rightShoulder.z - 0.06);
+    expect(pose.rightWrist.z).toBeLessThan(guardPose.rightWrist.z + 0.02);
   });
 
   it("gives straights, hooks, and uppercuts distinct counter lanes", () => {

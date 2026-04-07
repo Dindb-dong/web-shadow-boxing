@@ -528,12 +528,12 @@ function resolveDodgeMotion(type: DodgeType, progress: number): DodgeMotion {
     const outsideHand = {
       x: side * 0.052 * offLine,
       y: -0.13 * offLine,
-      z: 0.065 * offLine
+      z: -0.024 * offLine
     };
     const insideHand = {
       x: side * 0.016 * offLine,
       y: -0.085 * offLine,
-      z: 0.05 * offLine
+      z: -0.018 * offLine
     };
 
     return {
@@ -552,7 +552,7 @@ function resolveDodgeMotion(type: DodgeType, progress: number): DodgeMotion {
       torsoPosition: {
         x: side * 0.045 * offLine,
         y: -0.02 * offLine,
-        z: 0.026 * offLine
+        z: -0.012 * offLine
       },
       torsoRotation: {
         x: 0.065 * offLine,
@@ -565,12 +565,12 @@ function resolveDodgeMotion(type: DodgeType, progress: number): DodgeMotion {
   const outsideHand = {
     x: side * 0.085 * offLine,
     y: -0.02 * offLine,
-    z: 0.055 * offLine
+    z: -0.018 * offLine
   };
   const insideHand = {
     x: side * 0.03 * offLine,
     y: -0.012 * offLine,
-    z: 0.04 * offLine
+    z: -0.012 * offLine
   };
 
   return {
@@ -589,7 +589,7 @@ function resolveDodgeMotion(type: DodgeType, progress: number): DodgeMotion {
     torsoPosition: {
       x: side * 0.08 * offLine,
       y: 0,
-      z: 0.022 * offLine
+      z: -0.01 * offLine
     },
     torsoRotation: {
       x: -0.01 * offLine,
@@ -719,6 +719,7 @@ export function resolveArmRigPose(inputs: ArmRigInputs, profile: ArmRigProfile =
           ? { x: 0.24, y: 0.18, z: 0.45 }
           : { x: 0.18, y: 0.34, z: 0.52 };
     const activeIsLeft = inputs.counterMove.startsWith("left");
+    const activeSide: -1 | 1 = activeIsLeft ? -1 : 1;
     const activeBase = activeIsLeft ? leftWrist : rightWrist;
     const supportBase = activeIsLeft ? rightWrist : leftWrist;
     const activeShoulderBase = activeIsLeft ? leftShoulder : rightShoulder;
@@ -728,20 +729,41 @@ export function resolveArmRigPose(inputs: ArmRigInputs, profile: ArmRigProfile =
       y: punchPose.leadY,
       z: punchPose.leadZ
     });
-    const supportWrist = offsetVec3(supportBase, {
-      x: punchPose.rearX,
-      y: punchPose.rearY,
-      z: punchPose.rearZ
+    const supportGuard = offsetVec3(supportBase, {
+      x: -activeSide * 0.008,
+      y: 0.008,
+      z: 0.01
     });
-    const activeShoulder = offsetVec3(activeShoulderBase, {
+    const supportDrift = offsetVec3(supportGuard, {
+      x: punchPose.rearX * 0.08,
+      y: punchPose.rearY * 0.06,
+      z: punchPose.rearZ * 0.08
+    });
+    const supportHold = THREE.MathUtils.smoothstep(inputs.counterProgress, 0.12, 0.64);
+    const supportWrist = lerpVec3(supportDrift, supportGuard, supportHold);
+    let activeShoulder = offsetVec3(activeShoulderBase, {
       x: punchPose.leadShoulderX,
       y: punchPose.leadShoulderY,
       z: punchPose.leadShoulderZ
     });
-    const supportShoulder = offsetVec3(supportShoulderBase, {
+    let supportShoulder = offsetVec3(supportShoulderBase, {
       x: punchPose.rearShoulderX,
       y: punchPose.rearShoulderY,
       z: punchPose.rearShoulderZ
+    });
+    const shoulderRotateDrive =
+      moveKind === "straight"
+        ? THREE.MathUtils.smoothstep(inputs.counterProgress, 0.18, 0.52)
+        : THREE.MathUtils.smoothstep(inputs.counterProgress, 0.24, 0.58);
+    const shoulderLeadBoost = moveKind === "straight" ? 0.17 : moveKind === "hook" ? 0.118 : 0.096;
+    const shoulderRearPull = moveKind === "straight" ? 0.138 : moveKind === "hook" ? 0.102 : 0.084;
+    activeShoulder = offsetVec3(activeShoulder, {
+      x: -activeSide * 0.052 * shoulderRotateDrive,
+      z: shoulderLeadBoost * shoulderRotateDrive
+    });
+    supportShoulder = offsetVec3(supportShoulder, {
+      x: activeSide * 0.034 * shoulderRotateDrive,
+      z: -shoulderRearPull * shoulderRotateDrive
     });
 
     if (inputs.targetLocal) {
