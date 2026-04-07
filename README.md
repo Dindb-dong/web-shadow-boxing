@@ -4,7 +4,7 @@
 
 GitHub Actions workflows:
 - `.github/workflows/ci.yml`: runs `npm run test:run` and `npm run build` on PR and `main`.
-- `.github/workflows/vercel-deploy.yml`: deploys to Vercel Preview on PR, and Production on `main` push.
+- `.github/workflows/vercel-deploy.yml`: runs only after `CI` succeeds (`workflow_run`), then deploys Preview for PR and Production for `main` push.
 
 Required GitHub repository secrets:
 - `VERCEL_TOKEN`

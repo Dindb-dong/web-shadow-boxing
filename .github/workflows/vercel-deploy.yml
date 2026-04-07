@@ -1,12 +1,11 @@
 name: Vercel Deploy
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
   workflow_dispatch:
 
 concurrency:
@@ -19,11 +18,13 @@ env:
 
 jobs:
   preview-deploy:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,7 +43,8 @@ jobs:
 
       - name: Skip deploy (missing Vercel secrets)
         if: steps.check-secrets.outputs.enabled != 'true'
-        run: echo "Skipping preview deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
+        run: |
+          echo "Skipping preview deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
 
       - name: Install dependencies (include optional)
         if: steps.check-secrets.outputs.enabled == 'true'
@@ -69,11 +71,13 @@ jobs:
         run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
 
   production-deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -92,7 +96,8 @@ jobs:
 
       - name: Skip deploy (missing Vercel secrets)
         if: steps.check-secrets.outputs.enabled != 'true'
-        run: echo "Skipping production deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
+        run: |
+          echo "Skipping production deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
 
       - name: Install dependencies (include optional)
         if: steps.check-secrets.outputs.enabled == 'true'
