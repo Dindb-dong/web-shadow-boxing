@@ -49,13 +49,13 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. 이번 후속 모션 수정에서는 dodge와 counter를 모두 phase-based curve로 다시 정리해, weave는 off-line head movement와 shoulder roll을, duck은 level change와 짧은 복귀 박자를, straight/hook/uppercut은 서로 다른 펀치 lane과 torso drive를 사용한다. 이어진 추가 조정으로 counter duration을 약간 늘리고, target steering을 축별 가중치로 분리해 straight는 더 정확히 얼굴 line을 향하되 hook/uppercut 고유 shape는 끝까지 덜 무너지게 만들었다. 최근 손 포즈 교정에서는 direct hand yaw/roll은 완화하고, 대신 `resolveArmInwardTwist()`와 rigged arm chain twist를 더 강하게 적용해 상완/전완 축에서 fist orientation을 잡도록 바꿨다. 동시에 imported humanoid skeleton의 `Shoulder -> Upper Arm -> Lower Arm -> Hand` 체인을 직접 풀어 기본 가드 자세와 counter 펀치 연결감을 유지한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 idle/counter 모두에서 hand bone 위치에 동기화되며, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.4.0`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.4.1`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
 - AI 아바타는 외부에서 받은 rigged GLB 에셋 `characters3d.com - Titan Boxer.glb`를 로컬 `public/assets/characters3d.com - Titan Boxer.glb`로 보관해 로드한다.
 - 실행과 테스트는 Docker 기준으로 맞췄으며, `docker compose up app`, `docker compose run --rm test` 흐름을 사용한다.
-- 이번 모델 반영에서는 팀원이 전달한 새 `checkpoints/gru_model.pt`를 `scripts/export_boxer_ai_weights.py`로 다시 export해 `src/model/assets/boxerAiWeights.json`을 갱신했다. 동시에 GRU 출력 `traj`는 절대좌표가 아니라 변화량이라는 전달사항에 맞춰, 런타임에서 최신 프레임 손목 좌표(`left/right wrist`)를 더해 절대 normalized trajectory로 복원하도록 수정했다. 운영 설정도 `attacking threshold=0.7`, `smoothing beta=0.3`으로 맞췄고, 관련 회귀 테스트를 보강했다. 현재 버전 표기는 `1.4.0`이다.
+- 이번 모델 반영에서는 팀원이 전달한 새 `checkpoints/gru_model.pt`를 `scripts/export_boxer_ai_weights.py`로 다시 export해 `src/model/assets/boxerAiWeights.json`을 갱신했다. 동시에 GRU 출력 `traj`는 절대좌표가 아니라 변화량이라는 전달사항에 맞춰, 런타임에서 최신 프레임 손목 좌표(`left/right wrist`)를 더해 절대 normalized trajectory로 복원하도록 수정했다. 운영 설정도 `attacking threshold=0.7`, `smoothing beta=0.3`으로 맞췄고, 관련 회귀 테스트를 보강했다. 현재 버전 표기는 `1.4.1`이다.
 - 이번 반격 모션 보정에서는 `resolveArmRigPose()`의 rear/support wrist 오프셋 계수를 크게 낮춰, 카운터 중 반대손이 같이 뻗어 보이던 현상을 줄였다. 이제 active 손은 기존 lane으로 전진하되 rear 손은 guard 근처에 더 강하게 고정된다. 여기에 `rear glove drift` 회귀 테스트를 추가해 우/좌 카운터에서 반대손이 second punch처럼 앞으로 튀지 않는지 검증했다.
 - 이번 좌/우 카운터 축 회전 보정에서는 양 방향 모두에서 `치는 손 반대손 턱 가드 유지`와 `치는 쪽 어깨 전진 + 반대 어깨 후퇴`가 더 분명히 보이도록 shoulder drive를 추가로 보강했다. 구체적으로 카운터 진행 구간에서 active shoulder는 전방으로 더 밀고 support shoulder는 뒤로 더 당기며, rear hand는 `supportHold`로 guard anchor 근처에 락되게 했다. 좌/우 straight 모두에 대해 미러링 회귀 테스트를 추가해 한쪽만 맞고 반대쪽이 깨지는 상황을 막았다.
 - 이번 추가 후속 보정에서는 사용자 피드백대로 어깨 회전 강도를 한 단계 더 높였다. `shoulderLeadBoost/shoulderRearPull`과 어깨 x축 보조 이동량을 함께 키워, 우/좌 카운터 모두에서 치는 쪽 어깨가 더 확실히 앞으로 나오고 반대 어깨가 더 분명히 뒤로 빠지게 조정했다. 이에 맞춰 좌/우 straight 어깨 회귀 테스트 기준도 더 엄격한 값으로 상향했다.
@@ -132,6 +132,12 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 즉시 후속 보정에서는 직전 강한 손목 세움이 오히려 전완에 더 붙어 보인다는 피드백에 맞춰, `resolveHandPose()`의 pitch를 요청값대로 `x: 0.34 -> 0.01`로 크게 낮췄다. `y/z`는 그대로 유지해 좌우 미러 방향은 보존하고, 손목 pitch만 빠르게 비교 가능한 형태로 조정했다.
 - 이번 추가 가드 폭 보정에서는 사용자 요청대로 주먹 간격을 체감되게 더 크게 벌렸다. `resolveGuardAnchorX()`를 `±0.27/0.34 계열 -> ±0.36/0.44 계열`로 확장했고, fallback 가드도 `DEFAULT_ARM_RIG_PROFILE.x: ±0.30 -> ±0.40`, bounds 기반 guard 폭도 `size.x * 0.14 -> 0.18`로 함께 넓혀 리그 경로와 fallback 경로 모두에서 주먹 겹침이 줄도록 맞췄다.
 - 이번 엄지 관절 교정에서는 사용자 피드백대로 `손바닥 연결 엄지 관절(Thumb_Proximal)` 회전을 기존의 반대 방향으로 뒤집었다. 구체적으로 proximal만 `x: 0.8 -> -0.8`, `y/z`의 side 계수 부호를 반전해 관절 굽힘 방향을 역전시켰고, `Thumb_Intermediate/Distal`은 유지해 영향 범위를 proximal 관절로 한정했다. 관련 회귀 테스트도 proximal 부호 반전을 직접 검증하도록 갱신했다.
+- 이번 후속 엄지 미세 조정에서는 사용자 피드백(`펴진 느낌`)에 맞춰 `z`는 유지하고 `y`축만 다시 반대로 돌렸다. 엄지 `y`는 side 미러링을 제거하고 proximal/intermediate/distal 모두 음수 고정(`-0.20/-0.14/-0.02`)으로 바꿔, 양손 모두 손바닥 쪽으로 말리는 방향을 우선 적용했다.
+- 이번 즉시 후속 조정에서는 사용자 요청대로 엄지 `y`에 side 미러링을 다시 복구했다. 상수값은 그대로 유지(`-0.20/-0.14/-0.02`)하고 계산만 `side * negative-constant`로 바꿔 좌/우 손에서 동일 강도의 반대방향 회전이 나오도록 정리했다.
+- 이번 추가 엄지 보정에서는 사용자 요청대로 `y` 상수를 음수에서 양수로 전환하고, `z`는 크게 축소했다. 구체적으로 엄지 `y`는 `side * (0.20/0.14/0.02)`로 바꿔 side 미러링은 유지한 채 부호 기준을 양수 상수로 통일했고, `z`는 `0.72/0.52/0.16 -> 0.02/0.02/0.01`로 낮춰 손바닥에서 멀어지는 느낌을 줄이는 쪽으로 조정했다.
+- 이번 후속 미세 조정에서는 사용자 피드백대로 엄지 `y`를 거의 0에 가깝게 더 줄였다. `y`를 `side * (0.20/0.14/0.02) -> side * (0.03/0.02/0.005)`로 축소해 side 미러링은 유지하되 손바닥 lateral 벌어짐이 최소화되도록 조정했고, `z`는 직전 축소값(`0.02/0.02/0.01`)을 유지했다.
+- 이번 추가 조정에서는 사용자 요청대로 엄지 `y` 강도를 다시 크게 올렸다. `z`는 낮은 값(`0.02/0.02/0.01`)을 유지하고, `y`만 `side * (0.03/0.02/0.005) -> side * (0.34/0.24/0.08)`로 확대해 주먹을 쥘 때 엄지가 손바닥 쪽으로 더 확실히 감기도록 보정했다.
+- 이번 후속 손가락 보정에서는 엄지를 제외한 나머지 손가락에서 `손바닥 연결 관절(Proximal)` 굴곡만 추가로 키웠다. `Index/Middle/Ring 계열 proximal x`를 `1.38 -> 1.68`, `Pinky/Little proximal x`를 `1.82 -> 2.08`로 올리고, intermediate/distal은 유지해 “첫 마디만 덜 접혀 보이던” 문제를 집중 보정했다.
 
 ## Current Limitations
 

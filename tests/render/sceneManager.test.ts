@@ -394,27 +394,34 @@ describe("resolveElbowPole", () => {
 describe("resolveFingerCurlPose", () => {
   it("flips the thumb proximal joint so it no longer bends in the opposite direction", () => {
     const thumbProximal = resolveFingerCurlPose("L_Thumb_Proximal", -1);
+    const rightThumbProximal = resolveFingerCurlPose("R_Thumb_Proximal", 1);
     const thumbIntermediate = resolveFingerCurlPose("L_Thumb_Intermediate", -1);
     const thumbDistal = resolveFingerCurlPose("L_Thumb_Distal", -1);
 
     expect(thumbProximal.x).toBeLessThan(-0.75);
     expect(thumbProximal.y).toBeLessThan(0);
+    expect(rightThumbProximal.y).toBeGreaterThan(0);
     expect(thumbProximal.z).toBeLessThan(0);
-    expect(Math.abs(thumbProximal.y)).toBeLessThan(0.16);
-    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(0.5);
-    expect(Math.abs(thumbProximal.z)).toBeGreaterThan(Math.abs(thumbProximal.y));
-    expect(Math.abs(thumbIntermediate.y)).toBeGreaterThan(0.12);
-    expect(Math.abs(thumbIntermediate.z)).toBeGreaterThan(0.42);
-    expect(Math.abs(thumbDistal.y)).toBeLessThan(0.03);
-    expect(Math.abs(thumbDistal.z)).toBeGreaterThan(0.08);
+    expect(Math.abs(thumbProximal.y)).toBeCloseTo(Math.abs(rightThumbProximal.y), 5);
+    expect(Math.abs(thumbProximal.y)).toBeGreaterThan(0.3);
+    expect(Math.abs(thumbProximal.z)).toBeLessThan(0.03);
+    expect(Math.abs(thumbProximal.z)).toBeLessThanOrEqual(Math.abs(thumbProximal.y));
+    expect(Math.abs(thumbIntermediate.y)).toBeGreaterThan(0.2);
+    expect(Math.abs(thumbIntermediate.z)).toBeLessThan(0.03);
+    expect(Math.abs(thumbDistal.y)).toBeGreaterThan(0.07);
+    expect(Math.abs(thumbDistal.z)).toBeLessThan(0.02);
     expect(thumbDistal.scale).toBeLessThan(0.95);
   });
 
   it("keeps the pinky tighter than the index while also drawing it inward for a fist cup", () => {
     const pinkyProximal = resolveFingerCurlPose("R_Pinky_Proximal", 1);
     const indexProximal = resolveFingerCurlPose("R_Index_Proximal", 1);
+    const indexIntermediate = resolveFingerCurlPose("R_Index_Intermediate", 1);
 
     expect(pinkyProximal.x).toBeGreaterThan(indexProximal.x);
+    expect(indexProximal.x).toBeGreaterThan(1.6);
+    expect(pinkyProximal.x).toBeGreaterThan(2);
+    expect(indexProximal.x).toBeGreaterThan(indexIntermediate.x);
     expect(pinkyProximal.scale).toBeLessThan(indexProximal.scale);
     expect(pinkyProximal.y).toBeGreaterThan(0.1);
     expect(pinkyProximal.z).toBeLessThan(-0.3);

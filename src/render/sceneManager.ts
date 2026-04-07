@@ -476,13 +476,13 @@ export function resolveFingerCurlPose(boneName: string, side: -1 | 1): FingerCur
     // not when it points upward or drops straight down.
     return {
       x: isProximal ? -0.8 : isIntermediate ? 0.58 : 0.34,
-      y: side * (isProximal ? 0.12 : isIntermediate ? -0.16 : -0.02),
-      z: side * (isProximal ? 0.56 : isIntermediate ? -0.46 : -0.1),
+      y: side * (isProximal ? 0.34 : isIntermediate ? 0.24 : 0.08),
+      z: side * (isProximal ? 0.02 : isIntermediate ? 0.02 : 0.01),
       scale: isProximal ? 0.84 : isIntermediate ? 0.88 : 0.93
     };
   }
 
-  const baseX = isPinky ? (isProximal ? 1.82 : isIntermediate ? 1.52 : 1.24) : isProximal ? 1.38 : isIntermediate ? 1.1 : 0.88;
+  const baseX = isPinky ? (isProximal ? 2.08 : isIntermediate ? 1.52 : 1.24) : isProximal ? 1.68 : isIntermediate ? 1.1 : 0.88;
   return {
     x: baseX,
     y: isPinky ? side * 0.12 : 0,
