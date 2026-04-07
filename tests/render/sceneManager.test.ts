@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   biasTargetTowardViewer,
   resolveHandPose,
+  resolveThreatImpactPoint,
   resolveRenderableThreatPath,
   resolveElbowPole,
   resolveFingerCurlPose,
@@ -250,6 +251,31 @@ describe("resolveRenderableThreatPath", () => {
     expect(leftDominant[5].x).toBeCloseTo(0.24);
     expect(rightDominant[0].x).toBeLessThan(-1.8);
     expect(rightDominant[5].x).toBeCloseTo(-0.24);
+  });
+});
+
+describe("resolveThreatImpactPoint", () => {
+  it("uses the dominant punch path endpoint as the rendered hit location", () => {
+    const impactPoint = resolveThreatImpactPoint([
+      [
+        { x: 1.95, y: 1.58, z: -0.98 },
+        { x: 1.62, y: 1.62, z: -1.14 },
+        { x: 1.28, y: 1.66, z: -1.31 },
+        { x: 0.92, y: 1.71, z: -1.48 },
+        { x: 0.56, y: 1.76, z: -1.67 },
+        { x: 0.24, y: 1.79, z: -1.84 }
+      ],
+      [
+        { x: -0.62, y: 1.39, z: -0.98 },
+        { x: -0.61, y: 1.39, z: -1.01 },
+        { x: -0.6, y: 1.39, z: -1.02 },
+        { x: -0.6, y: 1.39, z: -1.03 },
+        { x: -0.59, y: 1.39, z: -1.03 },
+        { x: -0.59, y: 1.39, z: -1.03 }
+      ]
+    ]);
+
+    expect(impactPoint).toEqual({ x: 0.24, y: 1.79, z: -1.84 });
   });
 });
 
