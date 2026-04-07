@@ -50,9 +50,9 @@ jobs:
         if: steps.check-secrets.outputs.enabled == 'true'
         run: npm ci --include=optional
 
-      - name: Workaround npm optional dependency bug for Rollup
+      - name: Ensure Rollup native binary on Linux x64
         if: steps.check-secrets.outputs.enabled == 'true'
-        run: npm install --no-save @rollup/rollup-linux-x64-gnu
+        run: npm run ensure:rollup-native
 
       - name: Install Vercel CLI
         if: steps.check-secrets.outputs.enabled == 'true'
@@ -103,9 +103,9 @@ jobs:
         if: steps.check-secrets.outputs.enabled == 'true'
         run: npm ci --include=optional
 
-      - name: Workaround npm optional dependency bug for Rollup
+      - name: Ensure Rollup native binary on Linux x64
         if: steps.check-secrets.outputs.enabled == 'true'
-        run: npm install --no-save @rollup/rollup-linux-x64-gnu
+        run: npm run ensure:rollup-native
 
       - name: Install Vercel CLI
         if: steps.check-secrets.outputs.enabled == 'true'

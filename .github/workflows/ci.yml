@@ -23,8 +23,8 @@ jobs:
       - name: Install dependencies (include optional)
         run: npm ci --include=optional
 
-      - name: Workaround npm optional dependency bug for Rollup
-        run: npm install --no-save @rollup/rollup-linux-x64-gnu
+      - name: Ensure Rollup native binary on Linux x64
+        run: npm run ensure:rollup-native
 
       - name: Run tests
         run: npm run test:run
