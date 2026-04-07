@@ -1,4 +1,5 @@
 import { CombatSystem } from "../../src/game/combatSystem";
+import { AI_STAMINA_DODGE_COST, AI_STAMINA_MAX } from "../../src/game/constants";
 import type { ModelOutput, ResolvedPoseFrame, WristPairTrajectory } from "../../src/types/game";
 
 function createFaceThreatTrajectory(): WristPairTrajectory {
@@ -246,7 +247,7 @@ describe("combatSystem", () => {
     expect(launched.triggerCounter?.target?.x).toBeCloseTo(0);
     expect(launched.triggerCounter?.target?.y).toBeCloseTo(2.08);
     expect(launched.triggerCounter?.target?.z).toBeCloseTo(-0.8);
-    expect(first.snapshot.aiStamina).toBe(98);
+    expect(first.snapshot.aiStamina).toBe(AI_STAMINA_MAX - AI_STAMINA_DODGE_COST);
     expect(resolved.triggerCounter).toBeNull();
     expect(resolved.snapshot.playerHp).toBe(88);
     expect(resolved.snapshot.lastGuardResult).toBe("hit");

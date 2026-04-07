@@ -144,6 +144,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 후속 미세 조정에서는 사용자 피드백대로 엄지 `y`를 거의 0에 가깝게 더 줄였다. `y`를 `side * (0.20/0.14/0.02) -> side * (0.03/0.02/0.005)`로 축소해 side 미러링은 유지하되 손바닥 lateral 벌어짐이 최소화되도록 조정했고, `z`는 직전 축소값(`0.02/0.02/0.01`)을 유지했다.
 - 이번 추가 조정에서는 사용자 요청대로 엄지 `y` 강도를 다시 크게 올렸다. `z`는 낮은 값(`0.02/0.02/0.01`)을 유지하고, `y`만 `side * (0.03/0.02/0.005) -> side * (0.34/0.24/0.08)`로 확대해 주먹을 쥘 때 엄지가 손바닥 쪽으로 더 확실히 감기도록 보정했다.
 - 이번 후속 손가락 보정에서는 엄지를 제외한 나머지 손가락에서 `손바닥 연결 관절(Proximal)` 굴곡만 추가로 키웠다. `Index/Middle/Ring 계열 proximal x`를 `1.38 -> 1.68`, `Pinky/Little proximal x`를 `1.82 -> 2.08`로 올리고, intermediate/distal은 유지해 “첫 마디만 덜 접혀 보이던” 문제를 집중 보정했다.
+- 이번 전투 밸런스 후속 보정에서는 `AI가 너무 맞지 않고 스태미나가 거의 안 닳아 보이던` 체감을 완화하기 위해 회피 확률/스태미나 상수를 재튜닝했다. `AI_STAMINA_DODGE_COST`를 `2 -> 10`, `AI_STAMINA_RECOVERY_PER_SEC`를 `6 -> 2.5`, `AI_DODGE_CHANCE_MIN/MAX`를 `0.55/0.98 -> 0.32/0.92`로 조정해 회피 우선 구조는 유지하면서도 반복 공격에서 AI 체력이 실제로 감소할 수 있게 만들었다. 회귀는 `docker compose run --rm test`, `docker compose run --rm app npm run build`로 확인했다.
 
 ## Current Limitations
 
