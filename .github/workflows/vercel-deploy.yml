@@ -44,9 +44,13 @@ jobs:
         if: steps.check-secrets.outputs.enabled != 'true'
         run: echo "Skipping preview deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
 
-      - name: Install dependencies
+      - name: Install dependencies (include optional)
         if: steps.check-secrets.outputs.enabled == 'true'
-        run: npm ci
+        run: npm ci --include=optional
+
+      - name: Workaround npm optional dependency bug for Rollup
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: npm install --no-save @rollup/rollup-linux-x64-gnu
 
       - name: Install Vercel CLI
         if: steps.check-secrets.outputs.enabled == 'true'
@@ -90,9 +94,13 @@ jobs:
         if: steps.check-secrets.outputs.enabled != 'true'
         run: echo "Skipping production deploy: configure VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
 
-      - name: Install dependencies
+      - name: Install dependencies (include optional)
         if: steps.check-secrets.outputs.enabled == 'true'
-        run: npm ci
+        run: npm ci --include=optional
+
+      - name: Workaround npm optional dependency bug for Rollup
+        if: steps.check-secrets.outputs.enabled == 'true'
+        run: npm install --no-save @rollup/rollup-linux-x64-gnu
 
       - name: Install Vercel CLI
         if: steps.check-secrets.outputs.enabled == 'true'
