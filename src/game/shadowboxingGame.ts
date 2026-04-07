@@ -307,7 +307,7 @@ export class ShadowboxingGame {
         worldTraj: null,
         userPose: bufferSnapshot.currentPose
       });
-      this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);
+      this.applyCombatUpdate(combatUpdate, now);
       return;
     }
 
@@ -323,7 +323,7 @@ export class ShadowboxingGame {
         worldTraj: null,
         userPose: bufferSnapshot.currentPose
       });
-      this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);
+      this.applyCombatUpdate(combatUpdate, now);
       return;
     }
 
@@ -402,31 +402,46 @@ export class ShadowboxingGame {
         console.log("aiHitCooldown", "disabled");
         console.groupEnd();
       }
-      if (combatUpdate.triggerDodge) {
-        this.scene.triggerDodge(combatUpdate.triggerDodge, now);
-        this.recordDebugEvent(now, `AI dodge -> ${combatUpdate.triggerDodge}`);
-      }
-      if (combatUpdate.triggerCounter) {
-        this.scene.triggerCounter(
-          combatUpdate.triggerCounter.move,
-          combatUpdate.triggerCounter.result,
-          now,
-          combatUpdate.triggerCounter.target
-        );
-        this.recordDebugEvent(now, `AI counter -> ${combatUpdate.triggerCounter.move}`);
-      }
-      if (combatUpdate.snapshot.aiHp <= 0 && this.latestHudSnapshot.aiHp > 0) {
-        this.scene.triggerVictory(now);
-        this.recordDebugEvent(now, "Victory -> AI down");
-      } else if (combatUpdate.snapshot.playerHp <= 0 && this.latestHudSnapshot.playerHp > 0) {
-        this.scene.triggerDefeat(now);
-        this.recordDebugEvent(now, "Defeat -> Player down");
-      }
-
-      this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);
+      this.applyCombatUpdate(combatUpdate, now);
     } finally {
       this.inferenceBusy = false;
     }
+  }
+
+  /** Applies combat side effects and HUD refresh for every pose loop path, including prediction-gated frames. */
+  private applyCombatUpdate(
+    combatUpdate: ReturnType<CombatSystem["update"]>,
+    now: number
+  ): void {
+    this.combatHitboxOverlapLabel = combatUpdate.debug.avatarOverlap ? "avatar=yes" : "avatar=no";
+    this.dodgeChanceRollLabel =
+      combatUpdate.debug.dodgeChance === null || combatUpdate.debug.dodgeRoll === null
+        ? "n/a"
+        : `${combatUpdate.debug.dodgeChance.toFixed(2)} / ${combatUpdate.debug.dodgeRoll.toFixed(2)}`;
+    this.attackStartedEdgeLabel = combatUpdate.debug.attackStartedEdge ? "yes" : "no";
+
+    if (combatUpdate.triggerDodge) {
+      this.scene.triggerDodge(combatUpdate.triggerDodge, now);
+      this.recordDebugEvent(now, `AI dodge -> ${combatUpdate.triggerDodge}`);
+    }
+    if (combatUpdate.triggerCounter) {
+      this.scene.triggerCounter(
+        combatUpdate.triggerCounter.move,
+        combatUpdate.triggerCounter.result,
+        now,
+        combatUpdate.triggerCounter.target
+      );
+      this.recordDebugEvent(now, `AI counter -> ${combatUpdate.triggerCounter.move}`);
+    }
+    if (combatUpdate.snapshot.aiHp <= 0 && this.latestHudSnapshot.aiHp > 0) {
+      this.scene.triggerVictory(now);
+      this.recordDebugEvent(now, "Victory -> AI down");
+    } else if (combatUpdate.snapshot.playerHp <= 0 && this.latestHudSnapshot.playerHp > 0) {
+      this.scene.triggerDefeat(now);
+      this.recordDebugEvent(now, "Defeat -> Player down");
+    }
+
+    this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);
   }
 
   private toHudSnapshot(

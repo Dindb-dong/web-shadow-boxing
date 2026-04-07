@@ -12,6 +12,7 @@ const THREAT_FLASH_BASE_OPACITY = 0.92;
 const THREAT_RING_BASE_OPACITY = 0.82;
 const THREAT_SPARK_BASE_OPACITY = 0.9;
 const FIGHTER_ASSET_PATH = "/assets/characters3d.com - Titan Boxer.glb";
+const SHOW_GLOVE_MESH = false;
 
 interface PunchPose {
   leadX: number;
@@ -1022,6 +1023,8 @@ export class SceneManager {
     this.rightGlove.castShadow = true;
     this.leftGlove.renderOrder = 4;
     this.rightGlove.renderOrder = 4;
+    this.leftGlove.visible = SHOW_GLOVE_MESH;
+    this.rightGlove.visible = SHOW_GLOVE_MESH;
     this.bootstrapArmRig();
     this.avatarVisualGroup.add(this.fallbackAvatar);
     this.armRigGroup.visible = false;

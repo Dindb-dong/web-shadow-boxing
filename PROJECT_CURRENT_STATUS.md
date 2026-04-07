@@ -146,6 +146,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 후속 손가락 보정에서는 엄지를 제외한 나머지 손가락에서 `손바닥 연결 관절(Proximal)` 굴곡만 추가로 키웠다. `Index/Middle/Ring 계열 proximal x`를 `1.38 -> 1.68`, `Pinky/Little proximal x`를 `1.82 -> 2.08`로 올리고, intermediate/distal은 유지해 “첫 마디만 덜 접혀 보이던” 문제를 집중 보정했다.
 - 이번 전투 밸런스 후속 보정에서는 `AI가 너무 맞지 않고 스태미나가 거의 안 닳아 보이던` 체감을 완화하기 위해 회피 확률/스태미나 상수를 재튜닝했다. `AI_STAMINA_DODGE_COST`를 `2 -> 10`, `AI_STAMINA_RECOVERY_PER_SEC`를 `6 -> 2.5`, `AI_DODGE_CHANCE_MIN/MAX`를 `0.55/0.98 -> 0.32/0.92`로 조정해 회피 우선 구조는 유지하면서도 반복 공격에서 AI 체력이 실제로 감소할 수 있게 만들었다. 회귀는 `docker compose run --rm test`, `docker compose run --rm app npm run build`로 확인했다.
 - 이번 추가 밸런스 미세조정에서는 사용성 피드백에 맞춰 회피 유지력을 다시 조금 높였다. `AI_STAMINA_DODGE_COST`를 `10 -> 4`로 낮추고, `AI_STAMINA_RECOVERY_PER_SEC`를 `2.5 -> 3.2`로 소폭 올렸으며, `AI_DODGE_CHANCE_MIN/MAX`는 `0.32/0.92 -> 0.38/0.95`로 상향했다. 회피 우선 구조를 유지하면서도 이전보다는 더 자주 회피하고, 스태미나가 완전히 바닥나지 않게 조정했다.
+- 이번 UI/전투 루프 후속 수정에서는 요청사항대로 빨간 글러브 메쉬를 기본 비노출로 전환했다(`SHOW_GLOVE_MESH=false`). 동시에 `ShadowboxingGame`에 `applyCombatUpdate()` 공통 경로를 추가해, `buffering-sequence`/`wrists-hidden` 같은 예측 게이팅 프레임에서도 dodge/counter 트리거와 승리/패배 씬 전환, HUD 동기화가 누락되지 않도록 정리했다.
 
 ## Current Limitations
 
