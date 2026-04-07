@@ -318,36 +318,36 @@ describe("combatSystem", () => {
     expect(result.snapshot.activeThreat.stateName).toBe("idle");
   });
 
-  it("does not treat sub-0.5 attacking probability as a live threat", () => {
+  it("does not treat sub-0.7 attacking probability as a live threat", () => {
     const system = new CombatSystem(() => 0);
 
     const result = system.update({
       now: 100,
       modelMode: "mock",
       tracking: true,
-      output: createOutput("attacking", 0.31),
+      output: createOutput("attacking", 0.69),
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
 
     expect(result.triggerDodge).toBeNull();
-    expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.31);
+    expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.69);
   });
 
-  it("treats 0.5-and-up attacking probability as a live threat", () => {
+  it("treats 0.7-and-up attacking probability as a live threat", () => {
     const system = new CombatSystem(() => 0);
 
     const result = system.update({
       now: 100,
       modelMode: "mock",
       tracking: true,
-      output: createOutput("attacking", 0.51),
+      output: createOutput("attacking", 0.71),
       worldTraj: createFaceThreatTrajectory(),
       userPose: createGuardPose(false)
     });
 
     expect(result.triggerDodge).not.toBeNull();
-    expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.51);
+    expect(result.snapshot.activeThreat.attackingProb).toBeCloseTo(0.71);
   });
 
   it("counts only a tight wrist guard near the nose as a blocked counter", () => {

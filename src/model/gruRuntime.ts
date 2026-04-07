@@ -183,6 +183,34 @@ function reshapeTrajectory(flat: Float32Array, futureSteps: number): WristPairTr
   return traj as WristPairTrajectory;
 }
 
+function extractCurrentWristPositions(sequence: number[][]): [Vec3, Vec3] {
+  const lastFrame = sequence[sequence.length - 1];
+  if (!lastFrame || lastFrame.length < 48) {
+    return [
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: 0 }
+    ];
+  }
+
+  return [
+    { x: lastFrame[18], y: lastFrame[19], z: lastFrame[20] },
+    { x: lastFrame[45], y: lastFrame[46], z: lastFrame[47] }
+  ];
+}
+
+function addTrajectoryOffsets(
+  deltaTrajectory: WristPairTrajectory,
+  currentWrists: [Vec3, Vec3]
+): WristPairTrajectory {
+  return deltaTrajectory.map((wristSteps, wristIndex) =>
+    wristSteps.map((step) => ({
+      x: step.x + currentWrists[wristIndex].x,
+      y: step.y + currentWrists[wristIndex].y,
+      z: step.z + currentWrists[wristIndex].z
+    }))
+  ) as WristPairTrajectory;
+}
+
 /** Runs one boxer_ai GRU forward pass and converts it into the shared app contract. */
 export function runBoxerAiInference(
   weights: BoxerAiModelWeights,
@@ -210,12 +238,14 @@ export function runBoxerAiInference(
     weights.trajectoryOutputBias,
     trajectoryHidden
   );
+  const trajectoryDelta = reshapeTrajectory(trajectoryFlat, weights.futureSteps);
+  const currentWrists = extractCurrentWristPositions(sequence);
 
   return {
     state_idx: stateIdx,
     state_name: stateIdx === 1 ? "attacking" : "idle",
     attacking_prob: stateProb[1],
-    traj: reshapeTrajectory(trajectoryFlat, weights.futureSteps),
+    traj: addTrajectoryOffsets(trajectoryDelta, currentWrists),
     raw: {
       state_logits: Array.from(stateLogits),
       state_prob: Array.from(stateProb)

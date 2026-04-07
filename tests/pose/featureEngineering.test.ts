@@ -88,6 +88,14 @@ describe("featureEngineering", () => {
     expect(smoothed.leftWrist.x).toBeCloseTo(previous.leftWrist.x * 0.5 + current.leftWrist.x * 0.5);
   });
 
+  it("uses 0.3 as the default boxer_ai EMA smoothing beta", () => {
+    const previous = normalizePoseFrame(createResolvedFrame(0));
+    const current = normalizePoseFrame(createResolvedFrame(1));
+    const smoothed = smoothPoseFrame(current, previous);
+
+    expect(smoothed.leftWrist.x).toBeCloseTo(previous.leftWrist.x * 0.3 + current.leftWrist.x * 0.7);
+  });
+
   it("emits a ready 12-step feature window only after collecting 12 feature frames", () => {
     const buffer = new PoseSequenceBuffer();
     let latest = buffer.push(toPoseFrame(createResolvedFrame(0)));
