@@ -55,6 +55,8 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 
 - AI 아바타는 외부에서 받은 rigged GLB 에셋 `characters3d.com - Titan Boxer.glb`를 로컬 `public/assets/characters3d.com - Titan Boxer.glb`로 보관해 로드한다.
 - 실행과 테스트는 Docker 기준으로 맞췄으며, `docker compose up app`, `docker compose run --rm test` 흐름을 사용한다.
+- 이번 전투 밸런스 조정에서는 AI 피격 빈도를 줄이기 위해 회피 판정을 `스태미나 임계치 기반(이분)`에서 `스태미나 비례 확률 기반`으로 변경했다. `AI_DODGE_CHANCE_MIN/MAX`를 실제 사용해 저스태미나에서도 일정 확률로 회피가 가능하게 만들고, 동시에 `AI_STAMINA_DODGE_COST: 4 -> 2`, `AI_STAMINA_RECOVERY_PER_SEC: 4 -> 6`으로 조정해 연속 위협 상황에서 회피 유지력을 높였다. AI가 맞을 때 체력이 과도하게 빠지는 문제를 줄이기 위해 `AI_HIT_DAMAGE: 14 -> 8`, `AI_COUNTER_VULNERABLE_HIT_DAMAGE: 28 -> 16`으로 완화했다.
+- 이번 후속 전투 로직 보정에서는 사용자 피드백대로 `AI 체력 차감보다 회피 시도`를 항상 먼저 수행하도록 분기 순서를 재구성했다. 이제 `attackStarted + avatarThreat` 상황에서는 먼저 dodge roll을 평가하고, 실패했을 때만 일반 피격/카운터-취약 피격이 적용된다. 또한 tracking/output이 일시적으로 끊겨도 조기 return하지 않도록 바꿔, 이미 primed된 counter의 launch/resolve 타이머가 계속 진행된다.
 - 이번 배포 자동화 추가에서는 `.github/workflows/ci.yml`, `.github/workflows/vercel-deploy.yml`, `vercel.json`을 도입해 PR/메인 푸시 CI(테스트+빌드)와 Vercel Preview/Production 배포를 GitHub Actions로 자동화했다. Vercel 연동에는 `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` 저장소 시크릿이 필요하다.
 - GitHub Actions/Vercel 자동배포에서 `@rollup/rollup-linux-x64-gnu` optional dependency 누락으로 빌드가 깨지는 케이스를 막기 위해 `scripts/ensureRollupNative.mjs`를 추가했다. 이 스크립트는 Linux x64에서만 누락 여부를 검사하고, 현재 설치된 `rollup` 버전에 맞춰 네이티브 패키지를 `--no-save`로 보정 설치한다. CI/Vercel 워크플로우는 하드코딩 패키지 설치 대신 `npm run ensure:rollup-native`를 호출하도록 통일했다.
 - Vercel 배포 워크플로우는 CI와 동시에 돌던 문제를 해결하기 위해 trigger를 `push/pull_request`에서 `workflow_run(CI completed)`로 변경했다. 이제 CI가 성공한 경우에만 Preview/Production 배포가 진행된다.

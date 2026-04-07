@@ -246,7 +246,7 @@ describe("combatSystem", () => {
     expect(launched.triggerCounter?.target?.x).toBeCloseTo(0);
     expect(launched.triggerCounter?.target?.y).toBeCloseTo(2.08);
     expect(launched.triggerCounter?.target?.z).toBeCloseTo(-0.8);
-    expect(first.snapshot.aiStamina).toBe(96);
+    expect(first.snapshot.aiStamina).toBe(98);
     expect(resolved.triggerCounter).toBeNull();
     expect(resolved.snapshot.playerHp).toBe(88);
     expect(resolved.snapshot.lastGuardResult).toBe("hit");
@@ -590,8 +590,26 @@ describe("combatSystem", () => {
     expect(result.snapshot.successfulHits).toBe(0);
   });
 
-  it("lands a clean hit on the AI face when stamina is too low to dodge", () => {
+  it("can still dodge with low stamina when the dodge roll succeeds", () => {
     const system = new CombatSystem(() => 0);
+    setAiStamina(system, 0);
+
+    const result = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.9),
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    expect(result.triggerDodge).not.toBeNull();
+    expect(result.snapshot.aiHp).toBe(100);
+    expect(result.snapshot.successfulHits).toBe(0);
+  });
+
+  it("lands a clean hit on the AI face when the dodge roll fails", () => {
+    const system = new CombatSystem(() => 0.99);
     const output = createOutput("attacking", 0.9);
     setAiStamina(system, 0);
 
@@ -606,12 +624,13 @@ describe("combatSystem", () => {
 
     expect(result.triggerDodge).toBeNull();
     expect(result.snapshot.statusText).toContain("landed");
-    expect(result.snapshot.aiHp).toBe(86);
+    expect(result.snapshot.aiHp).toBe(92);
     expect(result.snapshot.successfulHits).toBe(1);
   });
 
-  it("lets the player interrupt the AI while the counter is primed", () => {
-    const system = new CombatSystem(() => 0);
+  it("lets the player interrupt the AI while the counter is primed when dodge roll fails", () => {
+    const dodgeRolls = [0, 0.99];
+    const system = new CombatSystem(() => dodgeRolls.shift() ?? 0.99);
     const output = createOutput("attacking", 0.9);
 
     const first = system.update({
@@ -641,14 +660,40 @@ describe("combatSystem", () => {
 
     expect(first.triggerDodge).not.toBeNull();
     expect(punish.triggerDodge).toBeNull();
-    expect(punish.snapshot.aiHp).toBe(72);
+    expect(punish.snapshot.aiHp).toBe(84);
     expect(punish.snapshot.successfulHits).toBe(1);
     expect(punish.snapshot.statusText).toContain("punished");
     expect(punish.snapshot.counterState).toBe("idle");
   });
 
-  it("applies damage when the trajectory intersects the visible AI torso even if it misses the face", () => {
+  it("still launches a primed counter on schedule even when tracking temporarily drops", () => {
     const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+
+    const first = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+    const launched = system.update({
+      now: 260,
+      modelMode: "mock",
+      tracking: false,
+      output: null,
+      worldTraj: null,
+      userPose: null
+    });
+
+    expect(first.triggerDodge).not.toBeNull();
+    expect(launched.triggerCounter?.result).toBe("none");
+    expect(launched.triggerCounter?.move).toBeDefined();
+  });
+
+  it("applies damage when the trajectory intersects the visible AI torso even if it misses the face", () => {
+    const system = new CombatSystem(() => 0.99);
     setAiStamina(system, 0);
     const result = system.update({
       now: 100,
@@ -660,12 +705,12 @@ describe("combatSystem", () => {
     });
 
     expect(result.triggerDodge).toBeNull();
-    expect(result.snapshot.aiHp).toBe(86);
+    expect(result.snapshot.aiHp).toBe(92);
     expect(result.snapshot.successfulHits).toBe(1);
   });
 
   it("applies AI damage when a trajectory segment crosses the face hitbox between sampled points", () => {
-    const system = new CombatSystem(() => 0);
+    const system = new CombatSystem(() => 0.99);
     setAiStamina(system, 0);
     const result = system.update({
       now: 100,
@@ -677,7 +722,7 @@ describe("combatSystem", () => {
     });
 
     expect(result.triggerDodge).toBeNull();
-    expect(result.snapshot.aiHp).toBe(86);
+    expect(result.snapshot.aiHp).toBe(92);
     expect(result.snapshot.successfulHits).toBe(1);
   });
 
@@ -768,7 +813,7 @@ describe("combatSystem", () => {
       userPose: createGuardPose(false)
     });
 
-    for (let index = 0; index < 8; index += 1) {
+    for (let index = 0; index < 13; index += 1) {
       latest = system.update({
         now: 100 + index * 200,
         modelMode: "mock",

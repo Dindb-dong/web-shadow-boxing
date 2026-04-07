@@ -1,4 +1,6 @@
 import {
+  AI_DODGE_CHANCE_MAX,
+  AI_DODGE_CHANCE_MIN,
   AI_COUNTER_VULNERABLE_HIT_DAMAGE,
   AI_HIT_DAMAGE,
   AI_HP_MAX,
@@ -313,25 +315,11 @@ export class CombatSystem {
       };
     }
 
-    if (!tracking || !output || !worldTraj) {
-      this.statusText = tracking ? "Collecting model-ready frames" : "Tracking lost";
-      this.threatExpiresAt = null;
-      this.threatStateName = output?.state_name ?? "idle";
-      this.threatProbability = output?.attacking_prob ?? 0;
-      this.attackActive = false;
-      this.attackResolved = false;
-      return {
-        snapshot: this.createSnapshot(modelMode, tracking),
-        triggerDodge,
-        triggerCounter,
-        debug
-      };
-    }
-
-    this.threatStateName = output.state_name;
-    this.threatProbability = output.attacking_prob;
-    const threatening = isThreateningOutput(output, THREAT_PROBABILITY_THRESHOLD);
-    const avatarThreat = threatening && trajectoryIntersectsAvatar(worldTraj);
+    const hasThreatInput = tracking && output !== null && worldTraj !== null;
+    this.threatStateName = output?.state_name ?? "idle";
+    this.threatProbability = output?.attacking_prob ?? 0;
+    const threatening = hasThreatInput ? isThreateningOutput(output as ModelOutput, THREAT_PROBABILITY_THRESHOLD) : false;
+    const avatarThreat = threatening && hasThreatInput && trajectoryIntersectsAvatar(worldTraj as WristPairTrajectory);
     const attackWindowExpired = this.threatExpiresAt !== null && now >= this.threatExpiresAt;
 
     if (!threatening) {
@@ -355,48 +343,54 @@ export class CombatSystem {
       this.attackResolved = false;
     }
 
-    if (attackStarted && threatening && !this.attackResolved && vulnerableToPunish && avatarThreat) {
-      this.applyAiHit(AI_COUNTER_VULNERABLE_HIT_DAMAGE);
-      this.cancelCounter();
-      this.attackResolved = true;
-      this.statusText = this.aiHp > 0 ? "You punished the AI during its counter" : "Victory. AI is down";
-    } else if (attackStarted && !this.attackResolved && avatarThreat) {
-      if (this.counterState === "idle" && this.dodgeType === null) {
-        const canDodge = this.aiStamina >= AI_STAMINA_DODGE_COST;
-        debug.dodgeChance = canDodge ? 1 : 0;
-        debug.dodgeRoll = canDodge ? 0 : 1;
+    if (attackStarted && !this.attackResolved && avatarThreat && hasThreatInput) {
+      const staminaRatio = clamp(this.aiStamina / AI_STAMINA_MAX, 0, 1);
+      const dodgeChance = AI_DODGE_CHANCE_MIN + (AI_DODGE_CHANCE_MAX - AI_DODGE_CHANCE_MIN) * staminaRatio;
+      const dodgeRoll = this.random();
+      const canDodge = dodgeRoll <= dodgeChance;
+      debug.dodgeChance = dodgeChance;
+      debug.dodgeRoll = dodgeRoll;
 
-        if (canDodge) {
-          this.aiStamina -= AI_STAMINA_DODGE_COST;
-          this.dodgeType = chooseDodgeType(worldTraj, this.random, this.lastDodgeSide);
-          this.lastDodgeSide = this.dodgeType.startsWith("left") ? "left" : "right";
-          this.counterMove = chooseCounterMove(this.dodgeType, this.counterIndex);
-          this.counterIndex += 1;
-          this.counterLaunchAt = now + COUNTER_LAUNCH_DELAY_MS;
-          this.counterResolveAt = now + COUNTER_LAUNCH_DELAY_MS + COUNTER_RESOLVE_DELAY_MS;
-          this.counterTarget = resolveCounterTarget(userPose);
-          this.counterState = "primed";
-          this.lastGuardResult = "none";
-          this.lastCounterDefense = "none";
-          this.attackResolved = true;
-          this.statusText = `AI ${this.dodgeType.replace("_", " ")} dodged and is loading a counter`;
-          triggerDodge = this.dodgeType;
-        } else {
-          this.applyAiHit(AI_HIT_DAMAGE);
-          this.attackResolved = true;
-          this.statusText = this.aiHp > 0 ? "Your punch landed on the AI" : "Victory. AI is down";
+      if (canDodge) {
+        this.aiStamina = Math.max(0, this.aiStamina - AI_STAMINA_DODGE_COST);
+        if (this.counterState !== "idle") {
+          this.cancelCounter();
         }
+        this.dodgeType = chooseDodgeType(worldTraj as WristPairTrajectory, this.random, this.lastDodgeSide);
+        this.lastDodgeSide = this.dodgeType.startsWith("left") ? "left" : "right";
+        this.counterMove = chooseCounterMove(this.dodgeType, this.counterIndex);
+        this.counterIndex += 1;
+        this.counterLaunchAt = now + COUNTER_LAUNCH_DELAY_MS;
+        this.counterResolveAt = now + COUNTER_LAUNCH_DELAY_MS + COUNTER_RESOLVE_DELAY_MS;
+        this.counterTarget = resolveCounterTarget(userPose);
+        this.counterState = "primed";
+        this.lastGuardResult = "none";
+        this.lastCounterDefense = "none";
+        this.attackResolved = true;
+        this.statusText = `AI ${this.dodgeType.replace("_", " ")} dodged and is loading a counter`;
+        triggerDodge = this.dodgeType;
+      } else if (vulnerableToPunish) {
+        this.applyAiHit(AI_COUNTER_VULNERABLE_HIT_DAMAGE);
+        this.cancelCounter();
+        this.attackResolved = true;
+        this.statusText = this.aiHp > 0 ? "You punished the AI during its counter" : "Victory. AI is down";
+      } else if (this.counterState === "idle" && this.dodgeType === null) {
+        this.applyAiHit(AI_HIT_DAMAGE);
+        this.attackResolved = true;
+        this.statusText = this.aiHp > 0 ? "Your punch landed on the AI" : "Victory. AI is down";
       } else {
         this.applyAiHit(AI_HIT_DAMAGE);
         this.attackResolved = true;
         this.statusText = this.aiHp > 0 ? "Your punch caught the AI mid-motion" : "Victory. AI is down";
       }
-    } else if (threatening && this.counterState === "primed") {
+    } else if (this.counterState === "primed") {
       this.statusText = this.counterLaunchAt !== null ? "AI counter is locked on your last head position" : "AI counter is in motion";
     } else if (avatarThreat && this.dodgeType !== null) {
       this.statusText = `AI ${this.dodgeType.replace("_", " ")} is slipping the punch`;
     } else if (threatening) {
       this.statusText = "Threat detected";
+    } else if (!tracking || !output || !worldTraj) {
+      this.statusText = tracking ? "Collecting model-ready frames" : "Tracking lost";
     } else {
       this.statusText = "Reading movement";
     }
