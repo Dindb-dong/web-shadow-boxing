@@ -418,6 +418,9 @@ export class ShadowboxingGame {
       if (combatUpdate.snapshot.aiHp <= 0 && this.latestHudSnapshot.aiHp > 0) {
         this.scene.triggerVictory(now);
         this.recordDebugEvent(now, "Victory -> AI down");
+      } else if (combatUpdate.snapshot.playerHp <= 0 && this.latestHudSnapshot.playerHp > 0) {
+        this.scene.triggerDefeat(now);
+        this.recordDebugEvent(now, "Defeat -> Player down");
       }
 
       this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);

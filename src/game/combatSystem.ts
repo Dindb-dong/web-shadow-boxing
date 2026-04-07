@@ -315,6 +315,23 @@ export class CombatSystem {
       };
     }
 
+    if (this.playerHp <= 0) {
+      this.statusText = "Defeat. You are down";
+      this.threatExpiresAt = null;
+      this.threatStateName = "idle";
+      this.threatProbability = 0;
+      this.attackActive = false;
+      this.attackResolved = true;
+      this.cancelCounter();
+      this.dodgeType = null;
+      return {
+        snapshot: this.createSnapshot(modelMode, tracking),
+        triggerDodge,
+        triggerCounter,
+        debug
+      };
+    }
+
     const hasThreatInput = tracking && output !== null && worldTraj !== null;
     this.threatStateName = output?.state_name ?? "idle";
     this.threatProbability = output?.attacking_prob ?? 0;
@@ -417,8 +434,11 @@ export class CombatSystem {
       this.counterResolveAt = null;
       this.counterTarget = null;
       if (guardResult === "hit") {
-        this.playerHp = Math.max(this.playerHp - 12, 0);
-        this.statusText = `${this.counterMove?.replace("_", " ") ?? "counter"} found your face`;
+        this.applyPlayerHit(12);
+        this.statusText =
+          this.playerHp > 0
+            ? `${this.counterMove?.replace("_", " ") ?? "counter"} found your face`
+            : "Defeat. You are down";
       } else {
         this.guardedCounters += 1;
         if (resolution.reason === "blocked") {
@@ -490,6 +510,21 @@ export class CombatSystem {
     this.lastCounterDefense = "none";
     if (this.aiHp === 0) {
       this.statusText = "Victory. AI is down";
+      this.threatExpiresAt = null;
+      this.threatStateName = "idle";
+      this.threatProbability = 0;
+      this.attackActive = false;
+      this.attackResolved = true;
+      this.cancelCounter();
+      this.dodgeType = null;
+    }
+  }
+
+  /** Applies one confirmed hit to the player. */
+  private applyPlayerHit(damage: number): void {
+    this.playerHp = Math.max(this.playerHp - damage, 0);
+    if (this.playerHp === 0) {
+      this.statusText = "Defeat. You are down";
       this.threatExpiresAt = null;
       this.threatStateName = "idle";
       this.threatProbability = 0;

@@ -5,6 +5,7 @@ import type { CounterMove, DodgeType, GuardResult, Vec3, WristPairTrajectory, Wr
 
 const COUNTER_ANIMATION_MS = 540;
 const VICTORY_ANIMATION_MS = 1100;
+const DEFEAT_ANIMATION_MS = 1400;
 const THREAT_IMPACT_POOL_SIZE = 14;
 const THREAT_IMPACT_DURATION_MS = 320;
 const THREAT_FLASH_BASE_OPACITY = 0.92;
@@ -110,6 +111,7 @@ export interface ArmRigInputs {
   counterProgress: number;
   targetLocal: Vec3 | null;
   victoryProgress: number | null;
+  defeatProgress: number | null;
 }
 
 interface ThreatImpactSpark {
@@ -787,6 +789,26 @@ export function resolveArmRigPose(inputs: ArmRigInputs, profile: ArmRigProfile =
   if (collapse > 0) {
     leftWrist = lerpVec3(leftWrist, profile.leftFallen, collapse);
     rightWrist = lerpVec3(rightWrist, profile.rightFallen, collapse);
+  } else {
+    const celebration = inputs.defeatProgress ?? 0;
+    if (celebration > 0) {
+      leftShoulder = lerpVec3(leftShoulder, offsetVec3(profile.leftShoulder, { x: -0.08, y: 0.16, z: 0.08 }), celebration);
+      rightShoulder = lerpVec3(
+        rightShoulder,
+        offsetVec3(profile.rightShoulder, { x: 0.08, y: 0.16, z: 0.08 }),
+        celebration
+      );
+      leftWrist = lerpVec3(
+        leftWrist,
+        offsetVec3(profile.leftShoulder, { x: -0.28, y: 1.02, z: 0.48 }),
+        celebration
+      );
+      rightWrist = lerpVec3(
+        rightWrist,
+        offsetVec3(profile.rightShoulder, { x: 0.28, y: 1.02, z: 0.48 }),
+        celebration
+      );
+    }
   }
 
   return {
@@ -876,6 +898,7 @@ export class SceneManager {
   private dodgeState: { type: DodgeType; startedAt: number } | null = null;
   private counterState: { startedAt: number; result: GuardResult; move: CounterMove; target: Vec3 } | null = null;
   private victoryState: { startedAt: number } | null = null;
+  private defeatState: { startedAt: number } | null = null;
 
   constructor(private readonly host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -1045,7 +1068,20 @@ export class SceneManager {
 
     this.dodgeState = null;
     this.counterState = null;
+    this.defeatState = null;
     this.victoryState = { startedAt: now };
+  }
+
+  /** Starts a celebration motion once the player HP reaches zero. */
+  triggerDefeat(now: number): void {
+    if (this.defeatState) {
+      return;
+    }
+
+    this.dodgeState = null;
+    this.counterState = null;
+    this.victoryState = null;
+    this.defeatState = { startedAt: now };
   }
 
   /** Advances scene animation and renders one frame. */
@@ -1115,6 +1151,7 @@ export class SceneManager {
     let dodgeProgress = 0;
     let counterProgress = 0;
     let victoryProgress: number | null = null;
+    let defeatProgress: number | null = null;
     let counterTargetLocal: Vec3 | null = null;
 
     this.avatarGroup.position.set(idleSwing * 0.035, idleDip * 0.018, 0);
@@ -1185,6 +1222,27 @@ export class SceneManager {
       this.avatarVisualGroup.rotation.x += -0.08 * collapse;
       this.avatarVisualGroup.rotation.z += 0.16 * collapse;
       this.shadowPlane.scale.set(1.08 + collapse * 0.54, 0.94 + collapse * 0.28, 1);
+    } else if (this.defeatState) {
+      const progress = Math.min((now - this.defeatState.startedAt) / DEFEAT_ANIMATION_MS, 1);
+      const stepIn = easeInOutSine(Math.min(progress / 0.4, 1));
+      const celebration = progress <= 0.16 ? 0 : easeInOutSine((progress - 0.16) / 0.84);
+      const sway = Math.sin(progress * Math.PI * 3) * (1 - progress) * 0.12;
+      defeatProgress = celebration;
+
+      this.avatarGroup.position.x += 0.04 * stepIn + sway * 0.4;
+      this.avatarGroup.position.y += 0.08 * celebration;
+      this.avatarGroup.position.z += 0.36 * stepIn;
+      this.avatarGroup.rotation.x += 0.05 * celebration;
+      this.avatarGroup.rotation.y += -0.22 * stepIn + sway;
+      this.avatarGroup.rotation.z += -0.04 * celebration;
+      this.avatarVisualGroup.position.y += 0.04 * celebration;
+      this.avatarVisualGroup.rotation.y += -0.18 * celebration;
+      this.avatarVisualGroup.rotation.z += -0.06 * celebration;
+      (this.leftGlove.material as THREE.MeshStandardMaterial).color.set("#f4b942");
+      (this.rightGlove.material as THREE.MeshStandardMaterial).color.set("#f4b942");
+      this.leftGlove.scale.setScalar(1.09 + 0.03 * celebration);
+      this.rightGlove.scale.setScalar(1.09 + 0.03 * celebration);
+      this.shadowPlane.scale.set(1.04 + celebration * 0.24, 0.98 + celebration * 0.08, 1);
     }
 
     const armPose = resolveArmRigPose(
@@ -1196,7 +1254,8 @@ export class SceneManager {
         counterMove: this.counterState?.move ?? null,
         counterProgress,
         targetLocal: counterTargetLocal,
-        victoryProgress
+        victoryProgress,
+        defeatProgress
       },
       this.armRigProfile
     );

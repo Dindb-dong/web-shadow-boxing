@@ -25,7 +25,8 @@ const BASE_INPUTS: ArmRigInputs = {
   counterMove: null,
   counterProgress: 0,
   targetLocal: null,
-  victoryProgress: null
+  victoryProgress: null,
+  defeatProgress: null
 };
 
 /** Measures Euclidean distance between two 3D points. */
@@ -234,6 +235,19 @@ describe("resolveArmRigPose", () => {
     expect(downPose.rightWrist.y).toBeLessThan(guardPose.rightWrist.y - 0.85);
     expect(downPose.leftElbow.y).toBeLessThan(guardPose.leftElbow.y - 0.35);
     expect(downPose.rightElbow.y).toBeLessThan(guardPose.rightElbow.y - 0.35);
+  });
+
+  it("raises both gloves into a celebration pose when the player is downed", () => {
+    const guardPose = resolveArmRigPose(BASE_INPUTS);
+    const celebrationPose = resolveArmRigPose({
+      ...BASE_INPUTS,
+      defeatProgress: 1
+    });
+
+    expect(celebrationPose.leftWrist.y).toBeGreaterThan(guardPose.leftWrist.y + 0.65);
+    expect(celebrationPose.rightWrist.y).toBeGreaterThan(guardPose.rightWrist.y + 0.65);
+    expect(celebrationPose.leftWrist.z).toBeGreaterThan(guardPose.leftWrist.z + 0.08);
+    expect(celebrationPose.rightWrist.z).toBeGreaterThan(guardPose.rightWrist.z + 0.08);
   });
 });
 

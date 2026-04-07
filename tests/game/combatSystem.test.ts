@@ -848,4 +848,69 @@ describe("combatSystem", () => {
     expect(afterDown.snapshot.aiHp).toBe(0);
     expect(afterDown.snapshot.statusText).toContain("Victory");
   });
+
+  it("stays down and stops launching fresh defense once the player hp reaches zero", () => {
+    const system = new CombatSystem(() => 0);
+    const output = createOutput("attacking", 0.9);
+    const threat = createFaceThreatTrajectory();
+    let latest = system.update({
+      now: 0,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("idle", 0.1),
+      worldTraj: threat,
+      userPose: createGuardPose(false)
+    });
+
+    for (let index = 0; index < 9; index += 1) {
+      system.update({
+        now: 100 + index * 1000,
+        modelMode: "mock",
+        tracking: true,
+        output,
+        worldTraj: threat,
+        userPose: createGuardPose(false)
+      });
+      system.update({
+        now: 280 + index * 1000,
+        modelMode: "mock",
+        tracking: true,
+        output,
+        worldTraj: threat,
+        userPose: createGuardPose(false)
+      });
+      latest = system.update({
+        now: 760 + index * 1000,
+        modelMode: "mock",
+        tracking: true,
+        output,
+        worldTraj: threat,
+        userPose: createGuardPose(false)
+      });
+      system.update({
+        now: 980 + index * 1000,
+        modelMode: "mock",
+        tracking: true,
+        output: createOutput("idle", 0.1),
+        worldTraj: threat,
+        userPose: createGuardPose(false)
+      });
+    }
+
+    const afterDown = system.update({
+      now: 9800,
+      modelMode: "mock",
+      tracking: true,
+      output,
+      worldTraj: threat,
+      userPose: createGuardPose(false)
+    });
+
+    expect(latest.snapshot.playerHp).toBe(0);
+    expect(latest.snapshot.statusText).toContain("Defeat");
+    expect(afterDown.triggerDodge).toBeNull();
+    expect(afterDown.triggerCounter).toBeNull();
+    expect(afterDown.snapshot.playerHp).toBe(0);
+    expect(afterDown.snapshot.statusText).toContain("Defeat");
+  });
 });
