@@ -58,10 +58,12 @@ export class ShadowboxingGame {
   private endgameState: "none" | "victory" | "defeat" = "none";
   private selectedDifficulty: DifficultyLevel = "intermediate";
   private pendingDifficultyResolver: ((level: DifficultyLevel) => void) | null = null;
+  private pendingGuideResolver: (() => void) | null = null;
   private roundLive = false;
   private roundStartSequence = 0;
   private playerId = "guest";
   private apiOnline = true;
+  private hasCombatResultHistory = false;
   private latestHudSnapshot: HudSnapshot = {
     aiHp: 100,
     playerHp: 100,
@@ -117,6 +119,7 @@ export class ShadowboxingGame {
     this.poseOverlay = new PoseOverlayRenderer(this.shell.videoOverlay);
     this.shell.cameraSelect.addEventListener("change", this.handleCameraSelectChange);
     this.shell.endgameRestartButton.addEventListener("click", this.handleRestartClick);
+    this.shell.guideConfirmButton.addEventListener("click", this.handleGuideConfirmClick);
     this.shell.difficultyBeginnerButton.addEventListener("click", this.handleBeginnerDifficultyClick);
     this.shell.difficultyIntermediateButton.addEventListener("click", this.handleIntermediateDifficultyClick);
     this.shell.difficultyExpertButton.addEventListener("click", this.handleExpertDifficultyClick);
@@ -131,6 +134,7 @@ export class ShadowboxingGame {
   /** Starts webcam permissions, pose detection, and both runtime loops. */
   async start(): Promise<void> {
     this.hideEndgameOverlay();
+    this.hideGuideOverlay();
     this.hideDifficultyOverlay();
     this.hideRoundStartOverlay();
     this.hideLeaderboardOverlay();
@@ -170,6 +174,7 @@ export class ShadowboxingGame {
     this.scene.dispose();
     this.shell.cameraSelect.removeEventListener("change", this.handleCameraSelectChange);
     this.shell.endgameRestartButton.removeEventListener("click", this.handleRestartClick);
+    this.shell.guideConfirmButton.removeEventListener("click", this.handleGuideConfirmClick);
     this.shell.difficultyBeginnerButton.removeEventListener("click", this.handleBeginnerDifficultyClick);
     this.shell.difficultyIntermediateButton.removeEventListener("click", this.handleIntermediateDifficultyClick);
     this.shell.difficultyExpertButton.removeEventListener("click", this.handleExpertDifficultyClick);
@@ -190,6 +195,16 @@ export class ShadowboxingGame {
     const now = performance.now();
     await this.startNewRoundWithDifficulty("restart");
     this.recordDebugEvent(now, `New game started (${this.selectedDifficulty})`);
+  };
+
+  private readonly handleGuideConfirmClick = (): void => {
+    if (!this.pendingGuideResolver) {
+      return;
+    }
+    const resolve = this.pendingGuideResolver;
+    this.pendingGuideResolver = null;
+    this.hideGuideOverlay();
+    resolve();
   };
 
   private readonly handleLeaderboardOpenClick = async (): Promise<void> => {
@@ -261,6 +276,14 @@ export class ShadowboxingGame {
     this.shell.difficultyOverlay.hidden = true;
   }
 
+  private showGuideOverlay(): void {
+    this.shell.guideOverlay.hidden = false;
+  }
+
+  private hideGuideOverlay(): void {
+    this.shell.guideOverlay.hidden = true;
+  }
+
   private hideRoundStartOverlay(): void {
     this.shell.roundStartOverlay.hidden = true;
     this.shell.roundStartText.classList.remove("is-countdown", "is-fight", "is-animating");
@@ -276,6 +299,8 @@ export class ShadowboxingGame {
 
   private applyPlayerSummary(player: PlayerSummary): void {
     this.playerId = player.playerId;
+    this.hasCombatResultHistory =
+      player.totalMatches > 0 || player.wins > 0 || player.losses > 0 || this.hasCombatResultHistory;
     this.shell.playerIdValue.textContent = this.playerId;
     storePlayerId(this.playerId);
   }
@@ -367,6 +392,22 @@ export class ShadowboxingGame {
     }
   }
 
+  private shouldShowGuideModal(): boolean {
+    return !this.hasCombatResultHistory;
+  }
+
+  private promptGuideModal(): Promise<void> {
+    if (this.pendingGuideResolver) {
+      this.pendingGuideResolver();
+      this.pendingGuideResolver = null;
+    }
+
+    this.showGuideOverlay();
+    return new Promise((resolve) => {
+      this.pendingGuideResolver = resolve;
+    });
+  }
+
   private promptDifficultySelection(reason: "start" | "restart"): Promise<DifficultyLevel> {
     if (this.pendingDifficultyResolver) {
       this.pendingDifficultyResolver(this.selectedDifficulty);
@@ -395,6 +436,7 @@ export class ShadowboxingGame {
     this.resetThreatAssessment();
     this.lastTrajectoryEmitRawProb = null;
     this.hideEndgameOverlay();
+    this.hideGuideOverlay();
     this.hideRoundStartOverlay();
     const resetSnapshot = this.combat.reset(this.predictor.mode, false);
     this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot);
@@ -462,6 +504,15 @@ export class ShadowboxingGame {
     const sequenceId = this.roundStartSequence;
     this.hideRoundStartOverlay();
     this.hideEndgameOverlay();
+    this.hideGuideOverlay();
+    if (this.shouldShowGuideModal()) {
+      this.latestHudSnapshot.statusText = "가이드를 확인해주세요";
+      this.hud.update(this.latestHudSnapshot);
+      await this.promptGuideModal();
+      if (sequenceId !== this.roundStartSequence) {
+        return;
+      }
+    }
     this.latestHudSnapshot.statusText = "Select difficulty to start the round";
     this.hud.update(this.latestHudSnapshot);
     const difficulty = await this.promptDifficultySelection(reason);
@@ -798,6 +849,7 @@ export class ShadowboxingGame {
 
     if (aiJustDown) {
       if (this.endgameState !== "victory") {
+        this.hasCombatResultHistory = true;
         this.scene.triggerVictory(now);
         this.recordDebugEvent(now, "Victory -> AI down");
         this.showEndgameOverlay("victory");
@@ -805,6 +857,7 @@ export class ShadowboxingGame {
       }
     } else if (playerJustDown) {
       if (this.endgameState !== "defeat") {
+        this.hasCombatResultHistory = true;
         this.scene.triggerDefeat(now);
         this.recordDebugEvent(now, "Defeat -> Player down");
         this.showEndgameOverlay("defeat");

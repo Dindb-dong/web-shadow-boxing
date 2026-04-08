@@ -11,6 +11,8 @@ describe("createAppShell", () => {
     const shell = createAppShell(root!);
 
     expect(shell.sceneHost.className).toContain("scene-host");
+    expect(shell.guideOverlay.hidden).toBe(true);
+    expect(shell.guideConfirmButton.textContent).toContain("난이도 선택");
     expect(shell.difficultyOverlay.hidden).toBe(true);
     expect(shell.difficultyTitle.textContent).toContain("Choose Round Difficulty");
     expect(shell.difficultyBeginnerButton.textContent).toContain("초보");
@@ -46,6 +48,9 @@ describe("createAppShell", () => {
     expect(shell.liveStateValue.textContent).toBe("IDLE");
     expect(shell.liveProbabilityValue.textContent).toBe("0%");
     expect(root?.textContent).toContain(`v${GAME_VERSION}`);
+    expect(root?.textContent).toContain("게임 시작 가이드");
+    expect(root?.textContent).toContain("연세대학교 인공지능학회 YAI");
+    expect(root?.textContent).toContain("총 3개의 난이도");
     expect(root?.textContent).toContain("Successful Hits");
     expect(root?.textContent).toContain("Defended Counters");
     expect(root?.textContent).toContain("Player & Leaderboard");

@@ -3,6 +3,8 @@ import { GAME_VERSION } from "../version";
 /** Creates the core DOM skeleton used by the app. */
 export function createAppShell(container: HTMLElement): {
   sceneHost: HTMLDivElement;
+  guideOverlay: HTMLDivElement;
+  guideConfirmButton: HTMLButtonElement;
   difficultyOverlay: HTMLDivElement;
   difficultyTitle: HTMLHeadingElement;
   difficultyDescription: HTMLParagraphElement;
@@ -65,6 +67,20 @@ export function createAppShell(container: HTMLElement): {
   container.innerHTML = `
     <div class="game-shell">
       <div class="scene-host"></div>
+      <div class="guide-overlay" data-role="guide-overlay" hidden>
+        <div class="guide-card">
+          <p class="eyebrow">Guide</p>
+          <h2 class="guide-title">게임 시작 가이드</h2>
+          <ol class="guide-list">
+            <li>이 프로젝트는 연세대학교 인공지능학회 YAI에서 26년도 봄 전반기 CV 프로젝트 팀이 제작했습니다.</li>
+            <li>본 게임은 유저의 주먹 궤도를 읽고 피한 후 반격하는 AI와의 스파링이며, 총 3개의 난이도가 있습니다.</li>
+            <li>웹캠에 얼굴부터 팔꿈치까지 모두 나와야 잘 인식이 되기에, 화면에서 약간 떨어져서 즐겨주세요.</li>
+          </ol>
+          <button class="guide-button" type="button" data-role="guide-confirm-button">
+            확인하고 난이도 선택
+          </button>
+        </div>
+      </div>
       <div class="difficulty-overlay" data-role="difficulty-overlay" hidden>
         <div class="difficulty-card">
           <p class="eyebrow">Difficulty</p>
@@ -222,6 +238,8 @@ export function createAppShell(container: HTMLElement): {
   `;
 
   const sceneHost = container.querySelector<HTMLDivElement>(".scene-host");
+  const guideOverlay = container.querySelector<HTMLDivElement>("[data-role='guide-overlay']");
+  const guideConfirmButton = container.querySelector<HTMLButtonElement>("[data-role='guide-confirm-button']");
   const difficultyOverlay = container.querySelector<HTMLDivElement>("[data-role='difficulty-overlay']");
   const difficultyTitle = container.querySelector<HTMLHeadingElement>("[data-role='difficulty-title']");
   const difficultyDescription = container.querySelector<HTMLParagraphElement>("[data-role='difficulty-description']");
@@ -285,6 +303,8 @@ export function createAppShell(container: HTMLElement): {
 
   if (
     !sceneHost ||
+    !guideOverlay ||
+    !guideConfirmButton ||
     !difficultyOverlay ||
     !difficultyTitle ||
     !difficultyDescription ||
@@ -349,6 +369,8 @@ export function createAppShell(container: HTMLElement): {
 
   return {
     sceneHost,
+    guideOverlay,
+    guideConfirmButton,
     difficultyOverlay,
     difficultyTitle,
     difficultyDescription,

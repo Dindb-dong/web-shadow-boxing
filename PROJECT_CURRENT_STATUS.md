@@ -157,6 +157,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 라운드 스타트 연출 추가에서는 난이도 선택 직후 `3 -> 2 -> 1` 카운트다운이 좌측에서 진입해 중앙에서 확대된 뒤 우측으로 빠지는 모션으로 재생되고, 마지막에 `Fight!!` 문구가 표시되도록 했다. 카운트다운/Fight 연출이 끝나기 전까지는 `round-start-lock`으로 전투 업데이트를 막아, 유저가 먼저 공격해도 AI 회피/체력 변동이 발생하지 않게 고정했다.
 - 이번 MongoDB 전적/리더보드 연동에서는 Vercel Serverless API(`api/player/bootstrap`, `api/player/rename`, `api/match/record`, `api/leaderboard`)를 추가하고, 프론트에서 `localStorage` 기반 playerId 세션을 유지하도록 연결했다. 경기 종료 시 승/패 및 hit/guard가 난이도와 함께 자동 저장되며, HUD 우측의 Player & Leaderboard 패널에서 ID 이어하기/변경과 리더보드(전체/현재 난이도)를 즉시 확인할 수 있다.
 - 이번 HUD/밸런스 후속 조정에서는 리더보드를 상시 패널에서 분리해 좌측 `Live Threat` 카드 하단의 `리더보드 보기` 버튼으로 여는 모달 UX로 변경했다. 동시에 AI 난이도를 낮추기 위해 `AI_STAMINA_DODGE_COST: 4 -> 6`, `AI_HIT_DAMAGE: 8 -> 11`, `AI_COUNTER_VULNERABLE_HIT_DAMAGE: 16 -> 22`로 조정해 회피 연속성과 피격 체감의 밸런스를 재설정했다.
+- 이번 온보딩 UX 후속에서는 난이도 선택 이전에 가이드 모달을 선행 노출하도록 추가했다. 단, 한 번이라도 승/패가 기록된 플레이어(`wins/losses/totalMatches > 0`)에게는 가이드 모달을 자동 스킵하고 바로 난이도 선택으로 진입한다.
 
 ## Current Limitations
 
