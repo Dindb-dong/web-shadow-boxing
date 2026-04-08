@@ -210,6 +210,13 @@ export class PoseSequenceBuffer {
       currentPose: resolved
     };
   }
+
+  /** Clears rolling pose/features so a new match starts from a clean sequence window. */
+  reset(): void {
+    this.recentPoses.length = 0;
+    this.recentFeatures.length = 0;
+    this.missingCount = 0;
+  }
 }
 
 export { FEATURE_DIMENSION };

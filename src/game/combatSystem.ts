@@ -543,4 +543,38 @@ export class CombatSystem {
     this.counterMove = null;
     this.counterState = "idle";
   }
+
+  /** Resets combat state so a new round can begin without a full page reload. */
+  reset(modelMode: ModelMode, tracking: boolean): CombatSnapshot {
+    this.aiHp = AI_HP_MAX;
+    this.playerHp = PLAYER_HP_MAX;
+    this.aiStamina = AI_STAMINA_MAX;
+    this.successfulHits = 0;
+    this.guardedCounters = 0;
+    this.counterDefenseStats = {
+      tightGuard: 0,
+      duck: 0,
+      weave: 0,
+      sway: 0
+    };
+    this.lastUpdateTime = null;
+    this.threatExpiresAt = null;
+    this.counterLaunchAt = null;
+    this.counterResolveAt = null;
+    this.counterTarget = null;
+    this.lastGuardResult = "none";
+    this.lastCounterDefense = "none";
+    this.dodgeType = null;
+    this.counterState = "idle";
+    this.counterMove = null;
+    this.counterIndex = 0;
+    this.lastDodgeSide = null;
+    this.statusText = "Warming up tracker";
+    this.threatStateName = "idle";
+    this.threatProbability = 0;
+    this.attackActive = false;
+    this.attackResolved = false;
+
+    return this.createSnapshot(modelMode, tracking);
+  }
 }

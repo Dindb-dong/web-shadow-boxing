@@ -1087,6 +1087,19 @@ export class SceneManager {
     this.defeatState = { startedAt: now };
   }
 
+  /** Clears transient combat animations so the next round starts from neutral pose. */
+  resetCombatScene(): void {
+    this.dodgeState = null;
+    this.counterState = null;
+    this.victoryState = null;
+    this.defeatState = null;
+    this.threatGroup.visible = false;
+    for (const slot of this.threatImpacts) {
+      slot.active = false;
+      slot.group.visible = false;
+    }
+  }
+
   /** Advances scene animation and renders one frame. */
   render(now: number): void {
     this.updateThreatEffects(now);

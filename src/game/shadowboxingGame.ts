@@ -46,6 +46,7 @@ export class ShadowboxingGame {
   private lastDebugEvent = "Booting debug HUD";
   private debugLogLines = ["Booting debug HUD"];
   private cameraSwitchInProgress = false;
+  private endgameState: "none" | "victory" | "defeat" = "none";
   private latestHudSnapshot: HudSnapshot = {
     aiHp: 100,
     playerHp: 100,
@@ -102,11 +103,20 @@ export class ShadowboxingGame {
     this.scene = new SceneManager(this.shell.sceneHost);
     this.poseOverlay = new PoseOverlayRenderer(this.shell.videoOverlay);
     this.shell.cameraSelect.addEventListener("change", this.handleCameraSelectChange);
+    this.shell.endgameRestartButton.addEventListener("click", this.handleRestartClick);
     window.addEventListener("resize", this.handleResize);
   }
 
   /** Starts webcam permissions, pose detection, and both runtime loops. */
   async start(): Promise<void> {
+    const now = performance.now();
+    this.scene.resetCombatScene();
+    this.poseBuffer.reset();
+    this.resetThreatAssessment();
+    this.lastTrajectoryEmitRawProb = null;
+    this.hideEndgameOverlay();
+    const resetSnapshot = this.combat.reset(this.predictor.mode, false);
+    this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot, now);
     this.hud.update(this.latestHudSnapshot);
 
     try {
@@ -137,12 +147,26 @@ export class ShadowboxingGame {
     this.poseTracker.dispose();
     this.scene.dispose();
     this.shell.cameraSelect.removeEventListener("change", this.handleCameraSelectChange);
+    this.shell.endgameRestartButton.removeEventListener("click", this.handleRestartClick);
     window.removeEventListener("resize", this.handleResize);
   }
 
   private readonly handleResize = (): void => {
     this.scene.resize();
     this.poseOverlay.resize();
+  };
+
+  private readonly handleRestartClick = (): void => {
+    const now = performance.now();
+    this.scene.resetCombatScene();
+    this.poseBuffer.reset();
+    this.resetThreatAssessment();
+    this.lastTrajectoryEmitRawProb = null;
+    this.hideEndgameOverlay();
+    const resetSnapshot = this.combat.reset(this.predictor.mode, false);
+    this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot, now);
+    this.hud.update(this.latestHudSnapshot);
+    this.recordDebugEvent(now, "New game started");
   };
 
   private readonly handleCameraSelectChange = async (): Promise<void> => {
@@ -219,6 +243,29 @@ export class ShadowboxingGame {
   /** Tracks the current reason, if any, that prediction is being suppressed. */
   private setPredictionGatedReason(reason: string): void {
     this.predictionGatedReason = reason;
+  }
+
+  /** Shows the final result card once combat reaches victory/defeat. */
+  private showEndgameOverlay(result: "victory" | "defeat"): void {
+    this.endgameState = result;
+    this.shell.endgameOverlay.hidden = false;
+    if (result === "victory") {
+      this.shell.endgameTitle.textContent = "Victory";
+      this.shell.endgameSubtitle.textContent = "AI is down. Start a fresh sparring round.";
+      this.shell.endgameOverlay.dataset.result = "victory";
+      return;
+    }
+
+    this.shell.endgameTitle.textContent = "Defeat";
+    this.shell.endgameSubtitle.textContent = "You are down. Reset and challenge the AI again.";
+    this.shell.endgameOverlay.dataset.result = "defeat";
+  }
+
+  /** Hides the final result card while combat is still active. */
+  private hideEndgameOverlay(): void {
+    this.endgameState = "none";
+    this.shell.endgameOverlay.hidden = true;
+    delete this.shell.endgameOverlay.dataset.result;
   }
 
   /** Adds one human-readable debug event to the on-screen log. */
@@ -433,12 +480,23 @@ export class ShadowboxingGame {
       );
       this.recordDebugEvent(now, `AI counter -> ${combatUpdate.triggerCounter.move}`);
     }
-    if (combatUpdate.snapshot.aiHp <= 0 && this.latestHudSnapshot.aiHp > 0) {
-      this.scene.triggerVictory(now);
-      this.recordDebugEvent(now, "Victory -> AI down");
-    } else if (combatUpdate.snapshot.playerHp <= 0 && this.latestHudSnapshot.playerHp > 0) {
-      this.scene.triggerDefeat(now);
-      this.recordDebugEvent(now, "Defeat -> Player down");
+    const aiJustDown = combatUpdate.snapshot.aiHp <= 0 && this.latestHudSnapshot.aiHp > 0;
+    const playerJustDown = combatUpdate.snapshot.playerHp <= 0 && this.latestHudSnapshot.playerHp > 0;
+
+    if (aiJustDown) {
+      if (this.endgameState !== "victory") {
+        this.scene.triggerVictory(now);
+        this.recordDebugEvent(now, "Victory -> AI down");
+        this.showEndgameOverlay("victory");
+      }
+    } else if (playerJustDown) {
+      if (this.endgameState !== "defeat") {
+        this.scene.triggerDefeat(now);
+        this.recordDebugEvent(now, "Defeat -> Player down");
+        this.showEndgameOverlay("defeat");
+      }
+    } else if (combatUpdate.snapshot.aiHp > 0 && combatUpdate.snapshot.playerHp > 0 && this.endgameState !== "none") {
+      this.hideEndgameOverlay();
     }
 
     this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);

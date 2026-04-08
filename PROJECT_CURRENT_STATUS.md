@@ -49,7 +49,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - `SceneManager`는 카운터 모션별 punch profile을 분기해 글러브 위치, torso 회전, 무게 중심 이동을 함께 애니메이션하며, 저장된 얼굴 목표 좌표 쪽으로 주먹이 향하도록 보정한다. 이번 후속 모션 수정에서는 dodge와 counter를 모두 phase-based curve로 다시 정리해, weave는 off-line head movement와 shoulder roll을, duck은 level change와 짧은 복귀 박자를, straight/hook/uppercut은 서로 다른 펀치 lane과 torso drive를 사용한다. 이어진 추가 조정으로 counter duration을 약간 늘리고, target steering을 축별 가중치로 분리해 straight는 더 정확히 얼굴 line을 향하되 hook/uppercut 고유 shape는 끝까지 덜 무너지게 만들었다. 최근 손 포즈 교정에서는 direct hand yaw/roll은 완화하고, 대신 `resolveArmInwardTwist()`와 rigged arm chain twist를 더 강하게 적용해 상완/전완 축에서 fist orientation을 잡도록 바꿨다. 동시에 imported humanoid skeleton의 `Shoulder -> Upper Arm -> Lower Arm -> Hand` 체인을 직접 풀어 기본 가드 자세와 counter 펀치 연결감을 유지한다. 위협 궤도는 combat 판정에 쓰는 raw path와 동일한 점열을 그대로 렌더링하고 1초 fade-out 한다. 빨간 글러브 메쉬는 idle/counter 모두에서 hand bone 위치에 동기화되며, AI HP가 0이 되면 별도 down/victory 모션을 재생한다.
 - `src/pages` 아래 정적 테스트 런타임이 추가되어, 별도 HTML 엔트리포인트에서 `SceneManager`만 독립적으로 띄워 canned dodge/counter 시퀀스를 재생할 수 있다.
 - `PoseTracker`는 MediaPipe `pose_landmarker_full` 모델을 사용하고, `1280x720 / 20fps ideal` 카메라 스트림과 background sample loop를 유지한다.
-- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.4.3`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
+- 게임 버전은 `package.json`과 `src/version.ts`에서 `1.4.5`로 맞췄고, 앞으로 사소한 수정은 patch, 큰 수정은 minor를 올리는 규칙으로 관리한다.
 
 ## Operational Notes
 
@@ -61,7 +61,7 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - GitHub Actions/Vercel 자동배포에서 `@rollup/rollup-linux-x64-gnu` optional dependency 누락으로 빌드가 깨지는 케이스를 막기 위해 `scripts/ensureRollupNative.mjs`를 추가했다. 이 스크립트는 Linux x64에서만 누락 여부를 검사하고, 현재 설치된 `rollup` 버전에 맞춰 네이티브 패키지를 `--no-save`로 보정 설치한다. CI/Vercel 워크플로우는 하드코딩 패키지 설치 대신 `npm run ensure:rollup-native`를 호출하도록 통일했다.
 - Vercel 배포 워크플로우는 CI와 동시에 돌던 문제를 해결하기 위해 trigger를 `push/pull_request`에서 `workflow_run(CI completed)`로 변경했다. 이제 CI가 성공한 경우에만 Preview/Production 배포가 진행된다.
 - 이번 종료 연출 업데이트에서는 전투 결과 씬을 양방향으로 분리했다. `AI HP 0`에서는 기존 다운 모션 기반 승리 씬을 유지하고, `Player HP 0`에서는 상대가 전진/상체 상승/양손 세리머니를 수행하는 패배 씬을 추가했다. 동시에 `CombatSystem`은 플레이어 체력 0에서 상태를 `Defeat. You are down`으로 고정하고 추가 dodge/counter를 중단하며, `ShadowboxingGame`은 체력 임계치 전환 순간에만 `SceneManager.triggerVictory/triggerDefeat`를 호출해 종료 연출이 중복 발동되지 않게 했다.
-- 이번 모델 반영에서는 팀원이 전달한 새 `checkpoints/gru_model.pt`를 `scripts/export_boxer_ai_weights.py`로 다시 export해 `src/model/assets/boxerAiWeights.json`을 갱신했다. 동시에 GRU 출력 `traj`는 절대좌표가 아니라 변화량이라는 전달사항에 맞춰, 런타임에서 최신 프레임 손목 좌표(`left/right wrist`)를 더해 절대 normalized trajectory로 복원하도록 수정했다. 운영 설정도 `attacking threshold=0.7`, `smoothing beta=0.3`으로 맞췄고, 관련 회귀 테스트를 보강했다. 현재 버전 표기는 `1.4.3`이다.
+- 이번 모델 반영에서는 팀원이 전달한 새 `checkpoints/gru_model.pt`를 `scripts/export_boxer_ai_weights.py`로 다시 export해 `src/model/assets/boxerAiWeights.json`을 갱신했다. 동시에 GRU 출력 `traj`는 절대좌표가 아니라 변화량이라는 전달사항에 맞춰, 런타임에서 최신 프레임 손목 좌표(`left/right wrist`)를 더해 절대 normalized trajectory로 복원하도록 수정했다. 운영 설정도 `attacking threshold=0.7`, `smoothing beta=0.3`으로 맞췄고, 관련 회귀 테스트를 보강했다. 현재 버전 표기는 `1.4.5`이다.
 - 이번 반격 모션 보정에서는 `resolveArmRigPose()`의 rear/support wrist 오프셋 계수를 크게 낮춰, 카운터 중 반대손이 같이 뻗어 보이던 현상을 줄였다. 이제 active 손은 기존 lane으로 전진하되 rear 손은 guard 근처에 더 강하게 고정된다. 여기에 `rear glove drift` 회귀 테스트를 추가해 우/좌 카운터에서 반대손이 second punch처럼 앞으로 튀지 않는지 검증했다.
 - 이번 좌/우 카운터 축 회전 보정에서는 양 방향 모두에서 `치는 손 반대손 턱 가드 유지`와 `치는 쪽 어깨 전진 + 반대 어깨 후퇴`가 더 분명히 보이도록 shoulder drive를 추가로 보강했다. 구체적으로 카운터 진행 구간에서 active shoulder는 전방으로 더 밀고 support shoulder는 뒤로 더 당기며, rear hand는 `supportHold`로 guard anchor 근처에 락되게 했다. 좌/우 straight 모두에 대해 미러링 회귀 테스트를 추가해 한쪽만 맞고 반대쪽이 깨지는 상황을 막았다.
 - 이번 추가 후속 보정에서는 사용자 피드백대로 어깨 회전 강도를 한 단계 더 높였다. `shoulderLeadBoost/shoulderRearPull`과 어깨 x축 보조 이동량을 함께 키워, 우/좌 카운터 모두에서 치는 쪽 어깨가 더 확실히 앞으로 나오고 반대 어깨가 더 분명히 뒤로 빠지게 조정했다. 이에 맞춰 좌/우 straight 어깨 회귀 테스트 기준도 더 엄격한 값으로 상향했다.
@@ -147,6 +147,10 @@ Step 3 웹게임 MVP는 `Vite + TypeScript + Three.js + Docker` 기반 브라우
 - 이번 전투 밸런스 후속 보정에서는 `AI가 너무 맞지 않고 스태미나가 거의 안 닳아 보이던` 체감을 완화하기 위해 회피 확률/스태미나 상수를 재튜닝했다. `AI_STAMINA_DODGE_COST`를 `2 -> 10`, `AI_STAMINA_RECOVERY_PER_SEC`를 `6 -> 2.5`, `AI_DODGE_CHANCE_MIN/MAX`를 `0.55/0.98 -> 0.32/0.92`로 조정해 회피 우선 구조는 유지하면서도 반복 공격에서 AI 체력이 실제로 감소할 수 있게 만들었다. 회귀는 `docker compose run --rm test`, `docker compose run --rm app npm run build`로 확인했다.
 - 이번 추가 밸런스 미세조정에서는 사용성 피드백에 맞춰 회피 유지력을 다시 조금 높였다. `AI_STAMINA_DODGE_COST`를 `10 -> 4`로 낮추고, `AI_STAMINA_RECOVERY_PER_SEC`를 `2.5 -> 3.2`로 소폭 올렸으며, `AI_DODGE_CHANCE_MIN/MAX`는 `0.32/0.92 -> 0.38/0.95`로 상향했다. 회피 우선 구조를 유지하면서도 이전보다는 더 자주 회피하고, 스태미나가 완전히 바닥나지 않게 조정했다.
 - 이번 UI/전투 루프 후속 수정에서는 요청사항대로 빨간 글러브 메쉬를 기본 비노출로 전환했다(`SHOW_GLOVE_MESH=false`). 동시에 `ShadowboxingGame`에 `applyCombatUpdate()` 공통 경로를 추가해, `buffering-sequence`/`wrists-hidden` 같은 예측 게이팅 프레임에서도 dodge/counter 트리거와 승리/패배 씬 전환, HUD 동기화가 누락되지 않도록 정리했다.
+- 이번 종료 UX 보강에서는 승리/패배 시 화면 중앙에 결과 문구 오버레이를 추가하고 `New Game Start` 버튼을 노출하도록 했다. 오버레이는 `createAppShell`에 새 endgame 레이어를 추가해 구현했고, `ShadowboxingGame`에서 AI/Player HP 종료 상태를 공통 `applyCombatUpdate()`에서 감지해 `Victory/Defeat` 문구와 재시작 버튼을 토글한다. 재시작 버튼은 현재 페이지 리로드로 즉시 새 라운드를 시작한다.
+- 이번 후속 정리에서는 디버깅용으로 임시 추가했던 상단 `패배 씬 재생/승리 씬 재생` 버튼을 제거했다. 이제 종료 오버레이는 실제 전투 결과(HP 0)에서만 노출되며, 화면 상단은 상시 HUD만 유지한다.
+- 이번 재시작 안정화 수정에서는 `New Game Start`가 페이지 리로드에만 의존하지 않도록 바꿨다. 버튼 클릭 시 `CombatSystem.reset()`, `SceneManager.resetCombatScene()`, `PoseSequenceBuffer.reset()`를 순서대로 호출해 HP/스태미나/카운터/승패 연출/예측 버퍼 상태를 즉시 초기화하고, 종료 오버레이도 즉시 숨긴 뒤 새 라운드를 시작한다.
+- 이번 후속 보강에서는 게임 시작(`start`) 시점에도 전투/씬/버퍼를 강제 초기화하도록 추가했고, 승리/패배 오버레이 트리거를 `HP <= 0` 상시 조건이 아니라 `직전 프레임 대비 0으로 떨어지는 엣지`에서만 발동하도록 조정했다. 이로써 리로드 직후 종료 상태 잔류로 오버레이가 재노출되는 케이스를 줄였다.
 
 ## Current Limitations
 

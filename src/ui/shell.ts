@@ -3,6 +3,10 @@ import { GAME_VERSION } from "../version";
 /** Creates the core DOM skeleton used by the app. */
 export function createAppShell(container: HTMLElement): {
   sceneHost: HTMLDivElement;
+  endgameOverlay: HTMLDivElement;
+  endgameTitle: HTMLHeadingElement;
+  endgameSubtitle: HTMLParagraphElement;
+  endgameRestartButton: HTMLButtonElement;
   videoPreview: HTMLVideoElement;
   videoOverlay: HTMLCanvasElement;
   cameraSelect: HTMLSelectElement;
@@ -45,6 +49,14 @@ export function createAppShell(container: HTMLElement): {
   container.innerHTML = `
     <div class="game-shell">
       <div class="scene-host"></div>
+      <div class="endgame-overlay" data-role="endgame-overlay" hidden>
+        <div class="endgame-card">
+          <p class="eyebrow">Combat Result</p>
+          <h2 class="endgame-title" data-role="endgame-title">Victory</h2>
+          <p class="endgame-subtitle" data-role="endgame-subtitle">You dropped the AI.</p>
+          <button class="endgame-button" type="button" data-role="endgame-restart">New Game Start</button>
+        </div>
+      </div>
       <div class="hud-overlay">
         <div class="hud-panel game-version-badge">v${GAME_VERSION}</div>
         <div class="hud-panel combat-stats-panel">
@@ -131,6 +143,10 @@ export function createAppShell(container: HTMLElement): {
   `;
 
   const sceneHost = container.querySelector<HTMLDivElement>(".scene-host");
+  const endgameOverlay = container.querySelector<HTMLDivElement>("[data-role='endgame-overlay']");
+  const endgameTitle = container.querySelector<HTMLHeadingElement>("[data-role='endgame-title']");
+  const endgameSubtitle = container.querySelector<HTMLParagraphElement>("[data-role='endgame-subtitle']");
+  const endgameRestartButton = container.querySelector<HTMLButtonElement>("[data-role='endgame-restart']");
   const videoPreview = container.querySelector<HTMLVideoElement>(".camera-preview");
   const videoOverlay = container.querySelector<HTMLCanvasElement>(".camera-overlay");
   const cameraSelect = container.querySelector<HTMLSelectElement>("[data-role='camera-select']");
@@ -172,6 +188,10 @@ export function createAppShell(container: HTMLElement): {
 
   if (
     !sceneHost ||
+    !endgameOverlay ||
+    !endgameTitle ||
+    !endgameSubtitle ||
+    !endgameRestartButton ||
     !videoPreview ||
     !videoOverlay ||
     !cameraSelect ||
@@ -216,6 +236,10 @@ export function createAppShell(container: HTMLElement): {
 
   return {
     sceneHost,
+    endgameOverlay,
+    endgameTitle,
+    endgameSubtitle,
+    endgameRestartButton,
     videoPreview,
     videoOverlay,
     cameraSelect,

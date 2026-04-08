@@ -11,6 +11,9 @@ describe("createAppShell", () => {
     const shell = createAppShell(root!);
 
     expect(shell.sceneHost.className).toContain("scene-host");
+    expect(shell.endgameOverlay.hidden).toBe(true);
+    expect(shell.endgameTitle.textContent).toContain("Victory");
+    expect(shell.endgameRestartButton.textContent).toContain("New Game Start");
     expect(shell.videoPreview.tagName).toBe("VIDEO");
     expect(shell.videoOverlay.tagName).toBe("CANVAS");
     expect(shell.cameraSelect.tagName).toBe("SELECT");
