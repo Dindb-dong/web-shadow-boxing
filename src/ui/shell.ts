@@ -11,6 +11,9 @@ export function createAppShell(container: HTMLElement): {
   difficultyExpertButton: HTMLButtonElement;
   roundStartOverlay: HTMLDivElement;
   roundStartText: HTMLParagraphElement;
+  leaderboardOverlay: HTMLDivElement;
+  leaderboardOpenButton: HTMLButtonElement;
+  leaderboardCloseButton: HTMLButtonElement;
   endgameOverlay: HTMLDivElement;
   endgameTitle: HTMLHeadingElement;
   endgameSubtitle: HTMLParagraphElement;
@@ -88,27 +91,12 @@ export function createAppShell(container: HTMLElement): {
       <div class="round-start-overlay" data-role="round-start-overlay" hidden>
         <p class="round-start-text" data-role="round-start-text">3</p>
       </div>
-      <div class="endgame-overlay" data-role="endgame-overlay" hidden>
-        <div class="endgame-card">
-          <p class="eyebrow">Combat Result</p>
-          <h2 class="endgame-title" data-role="endgame-title">Victory</h2>
-          <p class="endgame-subtitle" data-role="endgame-subtitle">You dropped the AI.</p>
-          <button class="endgame-button" type="button" data-role="endgame-restart">New Game Start</button>
-        </div>
-      </div>
-      <div class="hud-overlay">
-        <div class="hud-panel game-version-badge">v${GAME_VERSION}</div>
-        <div class="hud-panel combat-stats-panel">
-          <p class="eyebrow">Combat Stats</p>
-          <div class="metric-row"><span>Successful Hits</span><strong data-role="successful-hits">0</strong></div>
-          <div class="metric-row"><span>Defended Counters</span><strong data-role="guarded-counters">0</strong></div>
-          <div class="metric-row"><span>Tight Guard</span><strong data-role="defense-tight-guard">0</strong></div>
-          <div class="metric-row"><span>Duck</span><strong data-role="defense-duck">0</strong></div>
-          <div class="metric-row"><span>Weave</span><strong data-role="defense-weave">0</strong></div>
-          <div class="metric-row"><span>Sway</span><strong data-role="defense-sway">0</strong></div>
-        </div>
-        <div class="hud-panel leaderboard-panel">
-          <p class="eyebrow">Player & Leaderboard</p>
+      <div class="leaderboard-overlay" data-role="leaderboard-overlay" hidden>
+        <div class="leaderboard-modal">
+          <div class="leaderboard-modal-header">
+            <p class="eyebrow">Player & Leaderboard</p>
+            <button class="leaderboard-close-button" type="button" data-role="leaderboard-close-button">닫기</button>
+          </div>
           <div class="metric-row">
             <span>Player ID</span>
             <strong data-role="player-id">loading...</strong>
@@ -138,6 +126,26 @@ export function createAppShell(container: HTMLElement): {
           </button>
           <div class="leaderboard-list" data-role="leaderboard-list">Loading leaderboard...</div>
         </div>
+      </div>
+      <div class="endgame-overlay" data-role="endgame-overlay" hidden>
+        <div class="endgame-card">
+          <p class="eyebrow">Combat Result</p>
+          <h2 class="endgame-title" data-role="endgame-title">Victory</h2>
+          <p class="endgame-subtitle" data-role="endgame-subtitle">You dropped the AI.</p>
+          <button class="endgame-button" type="button" data-role="endgame-restart">New Game Start</button>
+        </div>
+      </div>
+      <div class="hud-overlay">
+        <div class="hud-panel game-version-badge">v${GAME_VERSION}</div>
+        <div class="hud-panel combat-stats-panel">
+          <p class="eyebrow">Combat Stats</p>
+          <div class="metric-row"><span>Successful Hits</span><strong data-role="successful-hits">0</strong></div>
+          <div class="metric-row"><span>Defended Counters</span><strong data-role="guarded-counters">0</strong></div>
+          <div class="metric-row"><span>Tight Guard</span><strong data-role="defense-tight-guard">0</strong></div>
+          <div class="metric-row"><span>Duck</span><strong data-role="defense-duck">0</strong></div>
+          <div class="metric-row"><span>Weave</span><strong data-role="defense-weave">0</strong></div>
+          <div class="metric-row"><span>Sway</span><strong data-role="defense-sway">0</strong></div>
+        </div>
         <div class="hud-panel ai-health-panel">
           <div class="ai-health-header">
             <span class="eyebrow">Opponent Vital</span>
@@ -157,6 +165,9 @@ export function createAppShell(container: HTMLElement): {
             <span>Attack Probability</span>
             <strong data-role="live-probability">0%</strong>
           </div>
+          <button class="leaderboard-open-button" type="button" data-role="leaderboard-open-button">
+            리더보드 보기
+          </button>
         </div>
         <div class="hud-panel debug-panel">
           <p class="eyebrow">Debug HUD</p>
@@ -221,6 +232,9 @@ export function createAppShell(container: HTMLElement): {
   const difficultyExpertButton = container.querySelector<HTMLButtonElement>("[data-role='difficulty-expert']");
   const roundStartOverlay = container.querySelector<HTMLDivElement>("[data-role='round-start-overlay']");
   const roundStartText = container.querySelector<HTMLParagraphElement>("[data-role='round-start-text']");
+  const leaderboardOverlay = container.querySelector<HTMLDivElement>("[data-role='leaderboard-overlay']");
+  const leaderboardOpenButton = container.querySelector<HTMLButtonElement>("[data-role='leaderboard-open-button']");
+  const leaderboardCloseButton = container.querySelector<HTMLButtonElement>("[data-role='leaderboard-close-button']");
   const endgameOverlay = container.querySelector<HTMLDivElement>("[data-role='endgame-overlay']");
   const endgameTitle = container.querySelector<HTMLHeadingElement>("[data-role='endgame-title']");
   const endgameSubtitle = container.querySelector<HTMLParagraphElement>("[data-role='endgame-subtitle']");
@@ -279,6 +293,9 @@ export function createAppShell(container: HTMLElement): {
     !difficultyExpertButton ||
     !roundStartOverlay ||
     !roundStartText ||
+    !leaderboardOverlay ||
+    !leaderboardOpenButton ||
+    !leaderboardCloseButton ||
     !endgameOverlay ||
     !endgameTitle ||
     !endgameSubtitle ||
@@ -340,6 +357,9 @@ export function createAppShell(container: HTMLElement): {
     difficultyExpertButton,
     roundStartOverlay,
     roundStartText,
+    leaderboardOverlay,
+    leaderboardOpenButton,
+    leaderboardCloseButton,
     endgameOverlay,
     endgameTitle,
     endgameSubtitle,

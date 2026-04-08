@@ -1,5 +1,10 @@
 import { CombatSystem } from "../../src/game/combatSystem";
-import { AI_STAMINA_DODGE_COST, AI_STAMINA_MAX } from "../../src/game/constants";
+import {
+  AI_COUNTER_VULNERABLE_HIT_DAMAGE,
+  AI_HIT_DAMAGE,
+  AI_STAMINA_DODGE_COST,
+  AI_STAMINA_MAX
+} from "../../src/game/constants";
 import type { ModelOutput, ResolvedPoseFrame, WristPairTrajectory } from "../../src/types/game";
 
 function createFaceThreatTrajectory(): WristPairTrajectory {
@@ -633,7 +638,7 @@ describe("combatSystem", () => {
     });
 
     expect(beginnerResult.triggerDodge).toBeNull();
-    expect(beginnerResult.snapshot.aiHp).toBe(92);
+    expect(beginnerResult.snapshot.aiHp).toBe(100 - AI_HIT_DAMAGE);
     expect(intermediateResult.triggerDodge).not.toBeNull();
     expect(intermediateResult.snapshot.aiHp).toBe(100);
   });
@@ -683,7 +688,7 @@ describe("combatSystem", () => {
 
     expect(result.triggerDodge).toBeNull();
     expect(result.snapshot.statusText).toContain("landed");
-    expect(result.snapshot.aiHp).toBe(92);
+    expect(result.snapshot.aiHp).toBe(100 - AI_HIT_DAMAGE);
     expect(result.snapshot.successfulHits).toBe(1);
   });
 
@@ -719,7 +724,7 @@ describe("combatSystem", () => {
 
     expect(first.triggerDodge).not.toBeNull();
     expect(punish.triggerDodge).toBeNull();
-    expect(punish.snapshot.aiHp).toBe(84);
+    expect(punish.snapshot.aiHp).toBe(100 - AI_COUNTER_VULNERABLE_HIT_DAMAGE);
     expect(punish.snapshot.successfulHits).toBe(1);
     expect(punish.snapshot.statusText).toContain("punished");
     expect(punish.snapshot.counterState).toBe("idle");
@@ -764,7 +769,7 @@ describe("combatSystem", () => {
     });
 
     expect(result.triggerDodge).toBeNull();
-    expect(result.snapshot.aiHp).toBe(92);
+    expect(result.snapshot.aiHp).toBe(100 - AI_HIT_DAMAGE);
     expect(result.snapshot.successfulHits).toBe(1);
   });
 
@@ -781,7 +786,7 @@ describe("combatSystem", () => {
     });
 
     expect(result.triggerDodge).toBeNull();
-    expect(result.snapshot.aiHp).toBe(92);
+    expect(result.snapshot.aiHp).toBe(100 - AI_HIT_DAMAGE);
     expect(result.snapshot.successfulHits).toBe(1);
   });
 

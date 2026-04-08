@@ -18,6 +18,9 @@ describe("createAppShell", () => {
     expect(shell.difficultyExpertButton.textContent).toContain("고수");
     expect(shell.roundStartOverlay.hidden).toBe(true);
     expect(shell.roundStartText.textContent).toContain("3");
+    expect(shell.leaderboardOverlay.hidden).toBe(true);
+    expect(shell.leaderboardOpenButton.textContent).toContain("리더보드 보기");
+    expect(shell.leaderboardCloseButton.textContent).toContain("닫기");
     expect(shell.endgameOverlay.hidden).toBe(true);
     expect(shell.endgameTitle.textContent).toContain("Victory");
     expect(shell.endgameRestartButton.textContent).toContain("New Game Start");
@@ -54,6 +57,7 @@ describe("createAppShell", () => {
     expect(root?.querySelector(".combat-stats-panel")?.textContent).toContain("Tight Guard");
     expect(root?.textContent).toContain("Live Threat");
     expect(root?.textContent).toContain("Attack Probability");
+    expect(root?.textContent).toContain("리더보드 보기");
     expect(root?.textContent).toContain("Pick a difficulty before this round starts");
     expect(root?.textContent).toContain("Camera");
     expect(root?.textContent).toContain("Debug HUD");

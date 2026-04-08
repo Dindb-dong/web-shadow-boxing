@@ -120,6 +120,8 @@ export class ShadowboxingGame {
     this.shell.difficultyBeginnerButton.addEventListener("click", this.handleBeginnerDifficultyClick);
     this.shell.difficultyIntermediateButton.addEventListener("click", this.handleIntermediateDifficultyClick);
     this.shell.difficultyExpertButton.addEventListener("click", this.handleExpertDifficultyClick);
+    this.shell.leaderboardOpenButton.addEventListener("click", this.handleLeaderboardOpenClick);
+    this.shell.leaderboardCloseButton.addEventListener("click", this.handleLeaderboardCloseClick);
     this.shell.connectIdButton.addEventListener("click", this.handleConnectIdClick);
     this.shell.renameIdButton.addEventListener("click", this.handleRenameIdClick);
     this.shell.leaderboardRefreshButton.addEventListener("click", this.handleLeaderboardRefreshClick);
@@ -131,6 +133,7 @@ export class ShadowboxingGame {
     this.hideEndgameOverlay();
     this.hideDifficultyOverlay();
     this.hideRoundStartOverlay();
+    this.hideLeaderboardOverlay();
     this.resetThreatAssessment();
     this.lastTrajectoryEmitRawProb = null;
     this.roundLive = false;
@@ -170,6 +173,8 @@ export class ShadowboxingGame {
     this.shell.difficultyBeginnerButton.removeEventListener("click", this.handleBeginnerDifficultyClick);
     this.shell.difficultyIntermediateButton.removeEventListener("click", this.handleIntermediateDifficultyClick);
     this.shell.difficultyExpertButton.removeEventListener("click", this.handleExpertDifficultyClick);
+    this.shell.leaderboardOpenButton.removeEventListener("click", this.handleLeaderboardOpenClick);
+    this.shell.leaderboardCloseButton.removeEventListener("click", this.handleLeaderboardCloseClick);
     this.shell.connectIdButton.removeEventListener("click", this.handleConnectIdClick);
     this.shell.renameIdButton.removeEventListener("click", this.handleRenameIdClick);
     this.shell.leaderboardRefreshButton.removeEventListener("click", this.handleLeaderboardRefreshClick);
@@ -185,6 +190,15 @@ export class ShadowboxingGame {
     const now = performance.now();
     await this.startNewRoundWithDifficulty("restart");
     this.recordDebugEvent(now, `New game started (${this.selectedDifficulty})`);
+  };
+
+  private readonly handleLeaderboardOpenClick = async (): Promise<void> => {
+    this.showLeaderboardOverlay();
+    await this.refreshLeaderboard();
+  };
+
+  private readonly handleLeaderboardCloseClick = (): void => {
+    this.hideLeaderboardOverlay();
   };
 
   private readonly handleConnectIdClick = async (): Promise<void> => {
@@ -250,6 +264,14 @@ export class ShadowboxingGame {
   private hideRoundStartOverlay(): void {
     this.shell.roundStartOverlay.hidden = true;
     this.shell.roundStartText.classList.remove("is-countdown", "is-fight", "is-animating");
+  }
+
+  private showLeaderboardOverlay(): void {
+    this.shell.leaderboardOverlay.hidden = false;
+  }
+
+  private hideLeaderboardOverlay(): void {
+    this.shell.leaderboardOverlay.hidden = true;
   }
 
   private applyPlayerSummary(player: PlayerSummary): void {

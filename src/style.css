@@ -150,6 +150,47 @@ body {
   display: none !important;
 }
 
+.leaderboard-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background: linear-gradient(180deg, rgba(3, 9, 16, 0.35), rgba(3, 9, 16, 0.8));
+}
+
+.leaderboard-overlay[hidden] {
+  display: none !important;
+}
+
+.leaderboard-modal {
+  width: min(32rem, 100%);
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(173, 217, 255, 0.24);
+  background: linear-gradient(180deg, rgba(10, 22, 35, 0.95), rgba(6, 14, 24, 0.9));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.44);
+}
+
+.leaderboard-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.leaderboard-close-button {
+  border-radius: 0.55rem;
+  border: 1px solid rgba(173, 217, 255, 0.22);
+  background: rgba(6, 16, 28, 0.9);
+  color: #d9efff;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.78rem;
+  padding: 0.28rem 0.52rem;
+  cursor: pointer;
+}
+
 .round-start-text {
   margin: 0;
   font-family: "Rajdhani", sans-serif;
@@ -341,6 +382,23 @@ body {
   color: #f7fbff;
 }
 
+.leaderboard-open-button {
+  margin-top: 0.66rem;
+  width: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(173, 217, 255, 0.22);
+  background: linear-gradient(135deg, #1f6aa5, #0c3c65);
+  color: #e9f5ff;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.86rem;
+  padding: 0.42rem 0.72rem;
+  cursor: pointer;
+}
+
+.leaderboard-open-button:hover {
+  filter: brightness(1.08);
+}
+
 .live-threat-panel[data-threat="attacking"] .live-threat-state,
 .live-threat-panel[data-threat="attacking"] .live-threat-probability strong {
   color: #ff9567;
@@ -381,14 +439,6 @@ body {
 
 .combat-stats-panel .metric-row {
   padding: 0.35rem 0;
-}
-
-.leaderboard-panel {
-  position: absolute;
-  top: 14.35rem;
-  right: 1rem;
-  width: min(15.5rem, calc(100% - 2rem));
-  padding: 0.68rem 0.82rem;
 }
 
 .id-row {
@@ -775,10 +825,6 @@ label,
     width: min(13.5rem, calc(100% - 2rem));
   }
 
-  .leaderboard-panel {
-    width: min(13.5rem, calc(100% - 2rem));
-  }
-
   .debug-panel {
     width: min(17.5rem, calc(100% - 2rem));
   }
@@ -831,8 +877,7 @@ label,
     width: 100%;
   }
 
-  .combat-stats-panel,
-  .leaderboard-panel {
+  .combat-stats-panel {
     position: static;
     width: 100%;
   }
