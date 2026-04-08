@@ -77,6 +77,7 @@ export default async function handler(req, res) {
     res.status(200).json({ difficulty, entries: rows });
   } catch (error) {
     const message = error instanceof Error ? error.message : "leaderboard failed";
+    console.error("[api/leaderboard] failed:", error);
     res.status(500).json({ error: message });
   }
 }

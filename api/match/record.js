@@ -68,6 +68,7 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "record failed";
+    console.error("[api/match/record] failed:", error);
     res.status(500).json({ error: message });
   }
 }

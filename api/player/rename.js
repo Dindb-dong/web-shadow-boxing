@@ -44,6 +44,7 @@ export default async function handler(req, res) {
     res.status(200).json({ player: toPlayerSummary(renamed) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "rename failed";
+    console.error("[api/player/rename] failed:", error);
     res.status(500).json({ error: message });
   }
 }

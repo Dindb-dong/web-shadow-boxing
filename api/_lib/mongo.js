@@ -1,16 +1,16 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB || "shadowboxing";
-
-if (!uri) {
-  throw new Error("Missing MONGODB_URI environment variable");
-}
 
 let cachedClient = globalThis.__shadowboxingMongoClient;
 let cachedDb = globalThis.__shadowboxingMongoDb;
 
 export async function getDb() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error("Missing MONGODB_URI environment variable");
+  }
+
   if (cachedDb && cachedClient) {
     return cachedDb;
   }

@@ -55,6 +55,7 @@ export default async function handler(req, res) {
     res.status(200).json({ created: true, player: toPlayerSummary(playerDoc) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "bootstrap failed";
+    console.error("[api/player/bootstrap] failed:", error);
     res.status(500).json({ error: message });
   }
 }
