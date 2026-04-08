@@ -10,7 +10,17 @@ import type { TrajectoryPredictor } from "../model/trajectoryPredictor";
 import { PoseSequenceBuffer } from "../pose/featureEngineering";
 import { PoseTracker } from "../pose/poseTracker";
 import { SceneManager } from "../render/sceneManager";
-import type { HudSnapshot, ModelOutput, WristPairTrajectory } from "../types/game";
+import {
+  bootstrapPlayer,
+  fetchLeaderboard,
+  readStoredPlayerId,
+  recordMatch,
+  renamePlayerId,
+  storePlayerId,
+  type MatchResult,
+  type PlayerSummary
+} from "../services/playerStatsApi";
+import type { DifficultyLevel, HudSnapshot, ModelOutput, WristPairTrajectory } from "../types/game";
 import { HudController } from "../ui/hud";
 import { PoseOverlayRenderer } from "../ui/poseOverlay";
 import { createAppShell } from "../ui/shell";
@@ -46,6 +56,12 @@ export class ShadowboxingGame {
   private debugLogLines = ["Booting debug HUD"];
   private cameraSwitchInProgress = false;
   private endgameState: "none" | "victory" | "defeat" = "none";
+  private selectedDifficulty: DifficultyLevel = "intermediate";
+  private pendingDifficultyResolver: ((level: DifficultyLevel) => void) | null = null;
+  private roundLive = false;
+  private roundStartSequence = 0;
+  private playerId = "guest";
+  private apiOnline = true;
   private latestHudSnapshot: HudSnapshot = {
     aiHp: 100,
     playerHp: 100,
@@ -101,16 +117,23 @@ export class ShadowboxingGame {
     this.poseOverlay = new PoseOverlayRenderer(this.shell.videoOverlay);
     this.shell.cameraSelect.addEventListener("change", this.handleCameraSelectChange);
     this.shell.endgameRestartButton.addEventListener("click", this.handleRestartClick);
+    this.shell.difficultyBeginnerButton.addEventListener("click", this.handleBeginnerDifficultyClick);
+    this.shell.difficultyIntermediateButton.addEventListener("click", this.handleIntermediateDifficultyClick);
+    this.shell.difficultyExpertButton.addEventListener("click", this.handleExpertDifficultyClick);
+    this.shell.connectIdButton.addEventListener("click", this.handleConnectIdClick);
+    this.shell.renameIdButton.addEventListener("click", this.handleRenameIdClick);
+    this.shell.leaderboardRefreshButton.addEventListener("click", this.handleLeaderboardRefreshClick);
     window.addEventListener("resize", this.handleResize);
   }
 
   /** Starts webcam permissions, pose detection, and both runtime loops. */
   async start(): Promise<void> {
-    this.scene.resetCombatScene();
-    this.poseBuffer.reset();
+    this.hideEndgameOverlay();
+    this.hideDifficultyOverlay();
+    this.hideRoundStartOverlay();
     this.resetThreatAssessment();
     this.lastTrajectoryEmitRawProb = null;
-    this.hideEndgameOverlay();
+    this.roundLive = false;
     const resetSnapshot = this.combat.reset(this.predictor.mode, false);
     this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot);
     this.hud.update(this.latestHudSnapshot);
@@ -120,8 +143,8 @@ export class ShadowboxingGame {
       await this.poseTracker.initialize(this.shell.videoPreview);
       await this.predictor.initialize();
       await this.refreshCameraSelect();
-      this.latestHudSnapshot.statusText = "Camera live. Building sequence buffer";
-      this.hud.update(this.latestHudSnapshot);
+      await this.initializePlayerProfile();
+      await this.startNewRoundWithDifficulty("start");
       this.schedulePoseLoop();
       this.scheduleRenderLoop();
     } catch (error) {
@@ -144,6 +167,12 @@ export class ShadowboxingGame {
     this.scene.dispose();
     this.shell.cameraSelect.removeEventListener("change", this.handleCameraSelectChange);
     this.shell.endgameRestartButton.removeEventListener("click", this.handleRestartClick);
+    this.shell.difficultyBeginnerButton.removeEventListener("click", this.handleBeginnerDifficultyClick);
+    this.shell.difficultyIntermediateButton.removeEventListener("click", this.handleIntermediateDifficultyClick);
+    this.shell.difficultyExpertButton.removeEventListener("click", this.handleExpertDifficultyClick);
+    this.shell.connectIdButton.removeEventListener("click", this.handleConnectIdClick);
+    this.shell.renameIdButton.removeEventListener("click", this.handleRenameIdClick);
+    this.shell.leaderboardRefreshButton.removeEventListener("click", this.handleLeaderboardRefreshClick);
     window.removeEventListener("resize", this.handleResize);
   }
 
@@ -152,18 +181,280 @@ export class ShadowboxingGame {
     this.poseOverlay.resize();
   };
 
-  private readonly handleRestartClick = (): void => {
+  private readonly handleRestartClick = async (): Promise<void> => {
     const now = performance.now();
+    await this.startNewRoundWithDifficulty("restart");
+    this.recordDebugEvent(now, `New game started (${this.selectedDifficulty})`);
+  };
+
+  private readonly handleConnectIdClick = async (): Promise<void> => {
+    const requested = this.shell.connectIdInput.value.trim();
+    if (!requested) {
+      return;
+    }
+    await this.bootstrapWithId(requested);
+    this.shell.connectIdInput.value = "";
+  };
+
+  private readonly handleRenameIdClick = async (): Promise<void> => {
+    const nextId = this.shell.renameIdInput.value.trim();
+    if (!nextId || !this.apiOnline) {
+      return;
+    }
+    try {
+      const player = await renamePlayerId(this.playerId, nextId);
+      this.applyPlayerSummary(player);
+      this.latestHudSnapshot.statusText = `Player ID changed to ${player.playerId}`;
+      this.hud.update(this.latestHudSnapshot);
+      await this.refreshLeaderboard();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "ID 변경 실패";
+      this.latestHudSnapshot.statusText = message;
+      this.hud.update(this.latestHudSnapshot);
+    } finally {
+      this.shell.renameIdInput.value = "";
+    }
+  };
+
+  private readonly handleLeaderboardRefreshClick = async (): Promise<void> => {
+    await this.refreshLeaderboard();
+  };
+
+  private readonly handleBeginnerDifficultyClick = (): void => {
+    this.resolveDifficultySelection("beginner");
+  };
+
+  private readonly handleIntermediateDifficultyClick = (): void => {
+    this.resolveDifficultySelection("intermediate");
+  };
+
+  private readonly handleExpertDifficultyClick = (): void => {
+    this.resolveDifficultySelection("expert");
+  };
+
+  private resolveDifficultySelection(level: DifficultyLevel): void {
+    if (!this.pendingDifficultyResolver) {
+      return;
+    }
+
+    const resolve = this.pendingDifficultyResolver;
+    this.pendingDifficultyResolver = null;
+    this.hideDifficultyOverlay();
+    resolve(level);
+  }
+
+  private hideDifficultyOverlay(): void {
+    this.shell.difficultyOverlay.hidden = true;
+  }
+
+  private hideRoundStartOverlay(): void {
+    this.shell.roundStartOverlay.hidden = true;
+    this.shell.roundStartText.classList.remove("is-countdown", "is-fight", "is-animating");
+  }
+
+  private applyPlayerSummary(player: PlayerSummary): void {
+    this.playerId = player.playerId;
+    this.shell.playerIdValue.textContent = this.playerId;
+    storePlayerId(this.playerId);
+  }
+
+  private async bootstrapWithId(requestedPlayerId: string | null): Promise<void> {
+    try {
+      const player = await bootstrapPlayer(requestedPlayerId);
+      this.apiOnline = true;
+      this.applyPlayerSummary(player);
+      this.latestHudSnapshot.statusText = `Player connected: ${player.playerId}`;
+      this.hud.update(this.latestHudSnapshot);
+      await this.refreshLeaderboard();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Player bootstrap failed";
+      this.apiOnline = false;
+      if (!this.playerId || this.playerId === "guest") {
+        const fallback = readStoredPlayerId() ?? `guest-${Math.random().toString(36).slice(2, 8)}`;
+        this.playerId = fallback;
+      }
+      this.shell.playerIdValue.textContent = `${this.playerId} (offline)`;
+      this.shell.leaderboardList.textContent = "Leaderboard unavailable (Mongo API offline)";
+      this.latestHudSnapshot.statusText = message;
+      this.hud.update(this.latestHudSnapshot);
+    }
+  }
+
+  private renderLeaderboardBlock(title: string, entries: Awaited<ReturnType<typeof fetchLeaderboard>>): string {
+    const lines = [title];
+    if (!entries.length) {
+      lines.push("No matches yet");
+      return lines.join("\n");
+    }
+    for (const entry of entries) {
+      const winRatePct = (entry.winRate * 100).toFixed(1);
+      const ratio = entry.hitGuardRatio.toFixed(2);
+      lines.push(
+        `${entry.rank}. ${entry.playerId} | WR ${winRatePct}% | M${entry.matches} | W${entry.wins}/L${entry.losses} | H/G ${ratio}`
+      );
+    }
+    return lines.join("\n");
+  }
+
+  private async refreshLeaderboard(): Promise<void> {
+    if (!this.apiOnline) {
+      this.shell.leaderboardList.textContent = "Leaderboard unavailable (Mongo API offline)";
+      return;
+    }
+    this.shell.leaderboardList.textContent = "Loading leaderboard...";
+    try {
+      const [overall, byDifficulty] = await Promise.all([
+        fetchLeaderboard("all", 8),
+        fetchLeaderboard(this.selectedDifficulty, 8)
+      ]);
+      this.shell.leaderboardList.textContent = [
+        this.renderLeaderboardBlock("Overall Top", overall),
+        "",
+        this.renderLeaderboardBlock(`${this.selectedDifficulty.toUpperCase()} Top`, byDifficulty)
+      ].join("\n");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Leaderboard fetch failed";
+      this.shell.leaderboardList.textContent = `Leaderboard error: ${message}`;
+    }
+  }
+
+  private async initializePlayerProfile(): Promise<void> {
+    const storedPlayerId = readStoredPlayerId();
+    await this.bootstrapWithId(storedPlayerId);
+  }
+
+  private async persistMatchResult(
+    result: MatchResult,
+    snapshot: ReturnType<CombatSystem["update"]>["snapshot"]
+  ): Promise<void> {
+    if (!this.apiOnline) {
+      return;
+    }
+    try {
+      await recordMatch({
+        playerId: this.playerId,
+        difficulty: this.selectedDifficulty,
+        result,
+        successfulHits: snapshot.successfulHits,
+        guardedCounters: snapshot.guardedCounters
+      });
+      await this.refreshLeaderboard();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Match record failed";
+      this.recordDebugEvent(performance.now(), `record failed: ${message}`);
+    }
+  }
+
+  private promptDifficultySelection(reason: "start" | "restart"): Promise<DifficultyLevel> {
+    if (this.pendingDifficultyResolver) {
+      this.pendingDifficultyResolver(this.selectedDifficulty);
+      this.pendingDifficultyResolver = null;
+    }
+
+    this.shell.difficultyTitle.textContent =
+      reason === "start" ? "Choose Your First Round Difficulty" : "Choose Difficulty For New Game";
+    this.shell.difficultyDescription.textContent =
+      reason === "start"
+        ? "Select the sparring level before the opening bell."
+        : "Select a difficulty before starting the next round.";
+    this.shell.difficultyOverlay.hidden = false;
+
+    return new Promise((resolve) => {
+      this.pendingDifficultyResolver = resolve;
+    });
+  }
+
+  private applyRoundReset(difficulty: DifficultyLevel): void {
+    this.roundLive = false;
+    this.selectedDifficulty = difficulty;
+    this.combat.setDifficulty(difficulty);
     this.scene.resetCombatScene();
     this.poseBuffer.reset();
     this.resetThreatAssessment();
     this.lastTrajectoryEmitRawProb = null;
     this.hideEndgameOverlay();
+    this.hideRoundStartOverlay();
     const resetSnapshot = this.combat.reset(this.predictor.mode, false);
     this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot);
+    this.latestHudSnapshot.statusText = `${difficulty.toUpperCase()} mode selected. Get ready...`;
     this.hud.update(this.latestHudSnapshot);
-    this.recordDebugEvent(now, "New game started");
-  };
+  }
+
+  private waitForAnimationOrTimeout(element: HTMLElement, timeoutMs: number): Promise<void> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const onAnimationEnd = (): void => {
+        finish();
+      };
+      const finish = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        element.removeEventListener("animationend", onAnimationEnd);
+        window.clearTimeout(timeout);
+        resolve();
+      };
+      const timeout = window.setTimeout(finish, timeoutMs);
+      element.addEventListener("animationend", onAnimationEnd);
+    });
+  }
+
+  private async playRoundStartCountdown(sequenceId: number): Promise<void> {
+    if (sequenceId !== this.roundStartSequence) {
+      return;
+    }
+
+    this.shell.roundStartOverlay.hidden = false;
+    const cueDurations = [1280, 1280, 1280];
+    const cues = ["3", "2", "1"];
+
+    for (let index = 0; index < cues.length; index += 1) {
+      if (sequenceId !== this.roundStartSequence) {
+        this.hideRoundStartOverlay();
+        return;
+      }
+      this.shell.roundStartText.textContent = cues[index];
+      this.shell.roundStartText.classList.remove("is-countdown", "is-fight", "is-animating");
+      void this.shell.roundStartText.offsetWidth;
+      this.shell.roundStartText.classList.add("is-countdown", "is-animating");
+      await this.waitForAnimationOrTimeout(this.shell.roundStartText, cueDurations[index]);
+    }
+
+    if (sequenceId !== this.roundStartSequence) {
+      this.hideRoundStartOverlay();
+      return;
+    }
+
+    this.shell.roundStartText.textContent = "Fight!!";
+    this.shell.roundStartText.classList.remove("is-countdown", "is-fight", "is-animating");
+    void this.shell.roundStartText.offsetWidth;
+    this.shell.roundStartText.classList.add("is-fight", "is-animating");
+    await this.waitForAnimationOrTimeout(this.shell.roundStartText, 1300);
+    this.hideRoundStartOverlay();
+  }
+
+  private async startNewRoundWithDifficulty(reason: "start" | "restart"): Promise<void> {
+    this.roundLive = false;
+    this.roundStartSequence += 1;
+    const sequenceId = this.roundStartSequence;
+    this.hideRoundStartOverlay();
+    this.hideEndgameOverlay();
+    this.latestHudSnapshot.statusText = "Select difficulty to start the round";
+    this.hud.update(this.latestHudSnapshot);
+    const difficulty = await this.promptDifficultySelection(reason);
+    if (sequenceId !== this.roundStartSequence) {
+      return;
+    }
+    this.applyRoundReset(difficulty);
+    await this.playRoundStartCountdown(sequenceId);
+    if (sequenceId !== this.roundStartSequence) {
+      return;
+    }
+    this.roundLive = true;
+    this.latestHudSnapshot.statusText = "Fight!!";
+    this.hud.update(this.latestHudSnapshot);
+  }
 
   private readonly handleCameraSelectChange = async (): Promise<void> => {
     const nextDeviceId = this.shell.cameraSelect.value;
@@ -335,6 +626,15 @@ export class ShadowboxingGame {
     this.poseOverlay.draw(overlayPoints, this.shell.videoPreview.videoWidth, this.shell.videoPreview.videoHeight);
     const bufferSnapshot = this.poseBuffer.push(sampled);
 
+    if (!this.roundLive) {
+      this.resetThreatAssessment();
+      this.setPredictionGatedReason("round-start-lock");
+      this.latestHudSnapshot.tracking = bufferSnapshot.tracking;
+      this.latestHudSnapshot.trackingLabel = bufferSnapshot.tracking ? "Locked" : "Searching";
+      this.latestHudSnapshot.debug = this.buildDebugSnapshot();
+      return;
+    }
+
     if (!bufferSnapshot.ready || !bufferSnapshot.basis) {
       this.resetThreatAssessment();
       this.setPredictionGatedReason(bufferSnapshot.tracking ? "buffering-sequence" : "tracking-unready");
@@ -479,12 +779,14 @@ export class ShadowboxingGame {
         this.scene.triggerVictory(now);
         this.recordDebugEvent(now, "Victory -> AI down");
         this.showEndgameOverlay("victory");
+        void this.persistMatchResult("win", combatUpdate.snapshot);
       }
     } else if (playerJustDown) {
       if (this.endgameState !== "defeat") {
         this.scene.triggerDefeat(now);
         this.recordDebugEvent(now, "Defeat -> Player down");
         this.showEndgameOverlay("defeat");
+        void this.persistMatchResult("loss", combatUpdate.snapshot);
       }
     } else if (combatUpdate.snapshot.aiHp > 0 && combatUpdate.snapshot.playerHp > 0 && this.endgameState !== "none") {
       this.hideEndgameOverlay();

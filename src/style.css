@@ -62,6 +62,158 @@ body {
   inset: 0;
 }
 
+.difficulty-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background: linear-gradient(180deg, rgba(3, 9, 16, 0.5), rgba(3, 9, 16, 0.82));
+}
+
+.difficulty-overlay[hidden] {
+  display: none !important;
+}
+
+.difficulty-card {
+  width: min(30rem, 100%);
+  padding: 1.4rem 1.3rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(173, 217, 255, 0.26);
+  background: linear-gradient(180deg, rgba(10, 22, 35, 0.96), rgba(6, 14, 24, 0.93));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+.difficulty-title {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-size: clamp(1.8rem, 4.2vw, 2.4rem);
+  line-height: 0.95;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffe7a1;
+}
+
+.difficulty-description {
+  margin: 0.62rem 0 0.95rem;
+  color: #d8ecf7;
+  font-size: 0.94rem;
+}
+
+.difficulty-options {
+  display: grid;
+  gap: 0.56rem;
+}
+
+.difficulty-button {
+  border: 1px solid rgba(173, 217, 255, 0.2);
+  border-radius: 0.9rem;
+  width: 100%;
+  padding: 0.72rem 0.8rem;
+  background: linear-gradient(180deg, rgba(15, 30, 46, 0.95), rgba(10, 21, 34, 0.88));
+  color: #eaf5ff;
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.difficulty-button:hover {
+  border-color: rgba(255, 187, 120, 0.7);
+  background: linear-gradient(180deg, rgba(26, 41, 58, 0.98), rgba(13, 24, 38, 0.94));
+}
+
+.difficulty-name {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1.06rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffe7a1;
+}
+
+.difficulty-note {
+  font-size: 0.86rem;
+  color: rgba(216, 236, 247, 0.84);
+}
+
+.round-start-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.round-start-overlay[hidden] {
+  display: none !important;
+}
+
+.round-start-text {
+  margin: 0;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 700;
+  font-size: clamp(4.4rem, 17vw, 11rem);
+  line-height: 0.9;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #ffe7a1;
+  -webkit-text-stroke: 1px rgba(255, 241, 196, 0.28);
+  text-shadow: 0 12px 36px rgba(0, 0, 0, 0.52);
+  opacity: 0;
+}
+
+.round-start-text.is-countdown.is-animating {
+  animation: round-countdown-fly 1180ms cubic-bezier(0.2, 0.75, 0.28, 1) forwards;
+}
+
+.round-start-text.is-fight.is-animating {
+  color: #ff8f66;
+  animation: round-fight-pop 1200ms cubic-bezier(0.16, 0.84, 0.26, 1) forwards;
+}
+
+@keyframes round-countdown-fly {
+  0% {
+    transform: translateX(-46vw) scale(0.24);
+    opacity: 0;
+  }
+  24% {
+    opacity: 1;
+  }
+  46% {
+    transform: translateX(0) scale(1.24);
+    opacity: 1;
+  }
+  70% {
+    transform: translateX(20vw) scale(0.84);
+    opacity: 0.92;
+  }
+  100% {
+    transform: translateX(44vw) scale(0.22);
+    opacity: 0;
+  }
+}
+
+@keyframes round-fight-pop {
+  0% {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+  26% {
+    transform: scale(1.24);
+    opacity: 1;
+  }
+  56% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.84);
+    opacity: 0;
+  }
+}
+
 .endgame-overlay {
   position: absolute;
   inset: 0;
@@ -229,6 +381,65 @@ body {
 
 .combat-stats-panel .metric-row {
   padding: 0.35rem 0;
+}
+
+.leaderboard-panel {
+  position: absolute;
+  top: 14.35rem;
+  right: 1rem;
+  width: min(15.5rem, calc(100% - 2rem));
+  padding: 0.68rem 0.82rem;
+}
+
+.id-row {
+  margin-top: 0.45rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.42rem;
+}
+
+.id-input {
+  min-width: 0;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(173, 217, 255, 0.22);
+  background: rgba(5, 14, 23, 0.85);
+  color: #e9f5ff;
+  font-size: 0.75rem;
+  padding: 0.34rem 0.42rem;
+}
+
+.id-button {
+  border-radius: 0.55rem;
+  border: 1px solid rgba(173, 217, 255, 0.22);
+  background: linear-gradient(135deg, #1f6aa5, #0c3c65);
+  color: #e9f5ff;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.76rem;
+  cursor: pointer;
+  padding: 0.34rem 0.5rem;
+}
+
+.id-button:hover {
+  filter: brightness(1.1);
+}
+
+.id-button-full {
+  margin-top: 0.48rem;
+  width: 100%;
+}
+
+.leaderboard-list {
+  margin-top: 0.48rem;
+  max-height: 9.2rem;
+  overflow: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(173, 217, 255, 0.14);
+  background: rgba(2, 7, 11, 0.64);
+  padding: 0.46rem;
+  font-size: 0.73rem;
+  line-height: 1.35;
+  color: rgba(231, 245, 255, 0.9);
+  white-space: pre-wrap;
 }
 
 .ai-health-panel {
@@ -564,6 +775,10 @@ label,
     width: min(13.5rem, calc(100% - 2rem));
   }
 
+  .leaderboard-panel {
+    width: min(13.5rem, calc(100% - 2rem));
+  }
+
   .debug-panel {
     width: min(17.5rem, calc(100% - 2rem));
   }
@@ -612,6 +827,12 @@ label,
   }
 
   .debug-panel {
+    position: static;
+    width: 100%;
+  }
+
+  .combat-stats-panel,
+  .leaderboard-panel {
     position: static;
     width: 100%;
   }

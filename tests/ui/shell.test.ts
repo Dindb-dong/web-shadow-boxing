@@ -11,12 +11,26 @@ describe("createAppShell", () => {
     const shell = createAppShell(root!);
 
     expect(shell.sceneHost.className).toContain("scene-host");
+    expect(shell.difficultyOverlay.hidden).toBe(true);
+    expect(shell.difficultyTitle.textContent).toContain("Choose Round Difficulty");
+    expect(shell.difficultyBeginnerButton.textContent).toContain("초보");
+    expect(shell.difficultyIntermediateButton.textContent).toContain("중수");
+    expect(shell.difficultyExpertButton.textContent).toContain("고수");
+    expect(shell.roundStartOverlay.hidden).toBe(true);
+    expect(shell.roundStartText.textContent).toContain("3");
     expect(shell.endgameOverlay.hidden).toBe(true);
     expect(shell.endgameTitle.textContent).toContain("Victory");
     expect(shell.endgameRestartButton.textContent).toContain("New Game Start");
     expect(shell.videoPreview.tagName).toBe("VIDEO");
     expect(shell.videoOverlay.tagName).toBe("CANVAS");
     expect(shell.cameraSelect.tagName).toBe("SELECT");
+    expect(shell.playerIdValue.textContent).toContain("loading");
+    expect(shell.connectIdInput.placeholder).toContain("기존 ID");
+    expect(shell.connectIdButton.textContent).toContain("이어하기");
+    expect(shell.renameIdInput.placeholder).toContain("새 ID");
+    expect(shell.renameIdButton.textContent).toContain("ID 변경");
+    expect(shell.leaderboardRefreshButton.textContent).toContain("Leaderboard");
+    expect(shell.leaderboardList.textContent).toContain("Loading leaderboard");
     expect(shell.cameraSelect.options[0]?.textContent).toContain("Default camera");
     expect(shell.aiHpBar.tagName).toBe("DIV");
     expect(shell.aiHpValue.textContent).toContain("100");
@@ -31,6 +45,8 @@ describe("createAppShell", () => {
     expect(root?.textContent).toContain(`v${GAME_VERSION}`);
     expect(root?.textContent).toContain("Successful Hits");
     expect(root?.textContent).toContain("Defended Counters");
+    expect(root?.textContent).toContain("Player & Leaderboard");
+    expect(root?.textContent).toContain("Player ID");
     expect(root?.textContent).toContain("Tight Guard");
     expect(root?.textContent).toContain("Duck");
     expect(root?.textContent).toContain("Weave");
@@ -38,6 +54,7 @@ describe("createAppShell", () => {
     expect(root?.querySelector(".combat-stats-panel")?.textContent).toContain("Tight Guard");
     expect(root?.textContent).toContain("Live Threat");
     expect(root?.textContent).toContain("Attack Probability");
+    expect(root?.textContent).toContain("Pick a difficulty before this round starts");
     expect(root?.textContent).toContain("Camera");
     expect(root?.textContent).toContain("Debug HUD");
     expect(root?.textContent).toContain("Raw Attacking Prob");

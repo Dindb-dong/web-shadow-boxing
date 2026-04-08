@@ -1,4 +1,5 @@
 export type StateName = "idle" | "attacking";
+export type DifficultyLevel = "beginner" | "intermediate" | "expert";
 export type DodgeType = "left_weave" | "right_weave" | "left_duck" | "right_duck";
 export type GuardResult = "guarded" | "hit" | "none";
 export type CounterDefenseType = "none" | "hit" | "tight_guard" | "duck" | "weave" | "sway";

@@ -144,3 +144,33 @@
 본 연구는 웹캠으로 추출한 시계열 포즈 데이터를 활용하여 미래 주먹 궤도와 공격 상태를 동시에 예측하는 GRU 기반 딥러닝 파이프라인을 성공적으로 구축하였다. 특히, 정규화 및 평활화 로직을 학습과 서빙 환경에서 엄격하게 일치시키고, 모델 추론을 외부 의존성 없는 클라이언트 내장 스크립트로 구현함으로써 지연 시간(Latency) 없는 서버리스 AI 전투 루프를 완성했다는 데 큰 의의가 있다.
 
 다양한 비디오 환경을 독립적으로 검증(`by_video_id`)하여 모델의 실제 일반화 성능을 확인하였으며, 향후에는 어퍼컷이나 변칙적인 훅 등 다변화된 펀치 궤적에 대한 위협 판정 체감도를 높이고, MediaPipe 모델 로드 최적화를 통해 초기 클라이언트 번들 크기를 경량화하는 고도화 작업이 요구된다.
+
+---
+
+## 9. MongoDB 전적/리더보드 연동
+
+이번 버전부터 Vercel Serverless Function + MongoDB 기반 전적 저장을 지원한다.
+
+### 9.1. 필요한 환경 변수
+
+- `MONGODB_URI`: MongoDB Atlas 연결 문자열
+- `MONGODB_DB`: 데이터베이스 이름 (예: `shadowboxing`)
+
+Vercel Project Settings > Environment Variables에 위 2개를 추가하면 된다.
+
+### 9.2. 제공 API
+
+- `POST /api/player/bootstrap`
+  - 랜덤 ID 생성 또는 입력 ID로 계정 연결/생성
+- `POST /api/player/rename`
+  - 기존 ID를 새 ID로 변경
+- `POST /api/match/record`
+  - 경기 결과(승/패, hit/guard, 난이도) 저장
+- `GET /api/leaderboard?difficulty=all|beginner|intermediate|expert&limit=10`
+  - 리더보드 조회
+
+### 9.3. 프론트 동작
+
+- 브라우저 `localStorage`에 `playerId`를 저장한다.
+- 새 기기에서도 같은 `playerId`를 입력해 이어서 전적을 사용한다.
+- 경기 종료 시 자동으로 전적이 저장되고 리더보드가 갱신된다.

@@ -1,6 +1,6 @@
 {
   "name": "shadowboxing-webgame",
-  "version": "1.4.6",
+  "version": "1.4.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.18",
+    "mongodb": "^6.16.0",
     "three": "^0.176.0"
   },
   "devDependencies": {

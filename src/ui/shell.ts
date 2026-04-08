@@ -3,6 +3,14 @@ import { GAME_VERSION } from "../version";
 /** Creates the core DOM skeleton used by the app. */
 export function createAppShell(container: HTMLElement): {
   sceneHost: HTMLDivElement;
+  difficultyOverlay: HTMLDivElement;
+  difficultyTitle: HTMLHeadingElement;
+  difficultyDescription: HTMLParagraphElement;
+  difficultyBeginnerButton: HTMLButtonElement;
+  difficultyIntermediateButton: HTMLButtonElement;
+  difficultyExpertButton: HTMLButtonElement;
+  roundStartOverlay: HTMLDivElement;
+  roundStartText: HTMLParagraphElement;
   endgameOverlay: HTMLDivElement;
   endgameTitle: HTMLHeadingElement;
   endgameSubtitle: HTMLParagraphElement;
@@ -10,6 +18,13 @@ export function createAppShell(container: HTMLElement): {
   videoPreview: HTMLVideoElement;
   videoOverlay: HTMLCanvasElement;
   cameraSelect: HTMLSelectElement;
+  playerIdValue: HTMLSpanElement;
+  connectIdInput: HTMLInputElement;
+  connectIdButton: HTMLButtonElement;
+  renameIdInput: HTMLInputElement;
+  renameIdButton: HTMLButtonElement;
+  leaderboardRefreshButton: HTMLButtonElement;
+  leaderboardList: HTMLDivElement;
   aiHpBar: HTMLDivElement;
   aiHpValue: HTMLSpanElement;
   successfulHitsValue: HTMLSpanElement;
@@ -47,6 +62,32 @@ export function createAppShell(container: HTMLElement): {
   container.innerHTML = `
     <div class="game-shell">
       <div class="scene-host"></div>
+      <div class="difficulty-overlay" data-role="difficulty-overlay" hidden>
+        <div class="difficulty-card">
+          <p class="eyebrow">Difficulty</p>
+          <h2 class="difficulty-title" data-role="difficulty-title">Choose Round Difficulty</h2>
+          <p class="difficulty-description" data-role="difficulty-description">
+            Pick a difficulty before this round starts.
+          </p>
+          <div class="difficulty-options">
+            <button class="difficulty-button" type="button" data-role="difficulty-beginner">
+              <span class="difficulty-name">초보</span>
+              <span class="difficulty-note">회피 최대 확률이 더 낮습니다.</span>
+            </button>
+            <button class="difficulty-button" type="button" data-role="difficulty-intermediate">
+              <span class="difficulty-name">중수</span>
+              <span class="difficulty-note">현재 기본 난이도입니다.</span>
+            </button>
+            <button class="difficulty-button" type="button" data-role="difficulty-expert">
+              <span class="difficulty-name">고수</span>
+              <span class="difficulty-note">유저 idle 시 선공하며 회피 최솟값이 더 높습니다.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="round-start-overlay" data-role="round-start-overlay" hidden>
+        <p class="round-start-text" data-role="round-start-text">3</p>
+      </div>
       <div class="endgame-overlay" data-role="endgame-overlay" hidden>
         <div class="endgame-card">
           <p class="eyebrow">Combat Result</p>
@@ -65,6 +106,37 @@ export function createAppShell(container: HTMLElement): {
           <div class="metric-row"><span>Duck</span><strong data-role="defense-duck">0</strong></div>
           <div class="metric-row"><span>Weave</span><strong data-role="defense-weave">0</strong></div>
           <div class="metric-row"><span>Sway</span><strong data-role="defense-sway">0</strong></div>
+        </div>
+        <div class="hud-panel leaderboard-panel">
+          <p class="eyebrow">Player & Leaderboard</p>
+          <div class="metric-row">
+            <span>Player ID</span>
+            <strong data-role="player-id">loading...</strong>
+          </div>
+          <div class="id-row">
+            <input
+              class="id-input"
+              type="text"
+              data-role="connect-id-input"
+              placeholder="기존 ID 입력"
+              maxlength="24"
+            />
+            <button class="id-button" type="button" data-role="connect-id-button">이어하기</button>
+          </div>
+          <div class="id-row">
+            <input
+              class="id-input"
+              type="text"
+              data-role="rename-id-input"
+              placeholder="새 ID 입력"
+              maxlength="24"
+            />
+            <button class="id-button" type="button" data-role="rename-id-button">ID 변경</button>
+          </div>
+          <button class="id-button id-button-full" type="button" data-role="leaderboard-refresh">
+            Leaderboard 새로고침
+          </button>
+          <div class="leaderboard-list" data-role="leaderboard-list">Loading leaderboard...</div>
         </div>
         <div class="hud-panel ai-health-panel">
           <div class="ai-health-header">
@@ -139,6 +211,16 @@ export function createAppShell(container: HTMLElement): {
   `;
 
   const sceneHost = container.querySelector<HTMLDivElement>(".scene-host");
+  const difficultyOverlay = container.querySelector<HTMLDivElement>("[data-role='difficulty-overlay']");
+  const difficultyTitle = container.querySelector<HTMLHeadingElement>("[data-role='difficulty-title']");
+  const difficultyDescription = container.querySelector<HTMLParagraphElement>("[data-role='difficulty-description']");
+  const difficultyBeginnerButton = container.querySelector<HTMLButtonElement>("[data-role='difficulty-beginner']");
+  const difficultyIntermediateButton = container.querySelector<HTMLButtonElement>(
+    "[data-role='difficulty-intermediate']"
+  );
+  const difficultyExpertButton = container.querySelector<HTMLButtonElement>("[data-role='difficulty-expert']");
+  const roundStartOverlay = container.querySelector<HTMLDivElement>("[data-role='round-start-overlay']");
+  const roundStartText = container.querySelector<HTMLParagraphElement>("[data-role='round-start-text']");
   const endgameOverlay = container.querySelector<HTMLDivElement>("[data-role='endgame-overlay']");
   const endgameTitle = container.querySelector<HTMLHeadingElement>("[data-role='endgame-title']");
   const endgameSubtitle = container.querySelector<HTMLParagraphElement>("[data-role='endgame-subtitle']");
@@ -146,6 +228,13 @@ export function createAppShell(container: HTMLElement): {
   const videoPreview = container.querySelector<HTMLVideoElement>(".camera-preview");
   const videoOverlay = container.querySelector<HTMLCanvasElement>(".camera-overlay");
   const cameraSelect = container.querySelector<HTMLSelectElement>("[data-role='camera-select']");
+  const playerIdValue = container.querySelector<HTMLSpanElement>("[data-role='player-id']");
+  const connectIdInput = container.querySelector<HTMLInputElement>("[data-role='connect-id-input']");
+  const connectIdButton = container.querySelector<HTMLButtonElement>("[data-role='connect-id-button']");
+  const renameIdInput = container.querySelector<HTMLInputElement>("[data-role='rename-id-input']");
+  const renameIdButton = container.querySelector<HTMLButtonElement>("[data-role='rename-id-button']");
+  const leaderboardRefreshButton = container.querySelector<HTMLButtonElement>("[data-role='leaderboard-refresh']");
+  const leaderboardList = container.querySelector<HTMLDivElement>("[data-role='leaderboard-list']");
   const aiHpBar = container.querySelector<HTMLDivElement>("[data-role='ai-hp']");
   const aiHpValue = container.querySelector<HTMLSpanElement>("[data-role='ai-hp-value']");
   const successfulHitsValue = container.querySelector<HTMLSpanElement>("[data-role='successful-hits']");
@@ -182,6 +271,14 @@ export function createAppShell(container: HTMLElement): {
 
   if (
     !sceneHost ||
+    !difficultyOverlay ||
+    !difficultyTitle ||
+    !difficultyDescription ||
+    !difficultyBeginnerButton ||
+    !difficultyIntermediateButton ||
+    !difficultyExpertButton ||
+    !roundStartOverlay ||
+    !roundStartText ||
     !endgameOverlay ||
     !endgameTitle ||
     !endgameSubtitle ||
@@ -189,6 +286,13 @@ export function createAppShell(container: HTMLElement): {
     !videoPreview ||
     !videoOverlay ||
     !cameraSelect ||
+    !playerIdValue ||
+    !connectIdInput ||
+    !connectIdButton ||
+    !renameIdInput ||
+    !renameIdButton ||
+    !leaderboardRefreshButton ||
+    !leaderboardList ||
     !aiHpBar ||
     !aiHpValue ||
     !successfulHitsValue ||
@@ -228,6 +332,14 @@ export function createAppShell(container: HTMLElement): {
 
   return {
     sceneHost,
+    difficultyOverlay,
+    difficultyTitle,
+    difficultyDescription,
+    difficultyBeginnerButton,
+    difficultyIntermediateButton,
+    difficultyExpertButton,
+    roundStartOverlay,
+    roundStartText,
     endgameOverlay,
     endgameTitle,
     endgameSubtitle,
@@ -235,6 +347,13 @@ export function createAppShell(container: HTMLElement): {
     videoPreview,
     videoOverlay,
     cameraSelect,
+    playerIdValue,
+    connectIdInput,
+    connectIdButton,
+    renameIdInput,
+    renameIdButton,
+    leaderboardRefreshButton,
+    leaderboardList,
     aiHpBar,
     aiHpValue,
     successfulHitsValue,

@@ -24,6 +24,7 @@ import type {
   CounterDefenseType,
   CounterTrigger,
   CounterMove,
+  DifficultyLevel,
   DodgeType,
   GuardResult,
   ModelMode,
@@ -74,6 +75,14 @@ interface CombatDebugTelemetry {
 }
 type DodgeSide = "left" | "right";
 
+interface CombatDifficultyConfig {
+  dodgeChanceMin: number;
+  dodgeChanceMax: number;
+  allowIdlePressure: boolean;
+  idlePressureChance: number;
+  idlePressureIntervalMs: number;
+}
+
 const AI_FACE_HITBOX: SphereHitbox = { center: { x: 0, y: 1.82, z: -1.88 }, radius: 0.34 };
 const AI_TORSO_HITBOX: SphereHitbox = { center: { x: 0, y: 1.2, z: -1.96 }, radius: 0.5 };
 const AI_AVATAR_HITBOXES: SphereHitbox[] = [AI_FACE_HITBOX, AI_TORSO_HITBOX];
@@ -82,6 +91,30 @@ const AI_AVATAR_XY_HITBOXES: CircleHitbox[] = AI_AVATAR_HITBOXES.map((sphere) =>
   centerY: sphere.center.y,
   radius: sphere.radius
 }));
+const IDLE_PRESSURE_MOVE_PATTERN: CounterMove[] = ["left_straight", "right_straight", "left_hook", "right_hook"];
+const COMBAT_DIFFICULTY_CONFIG: Record<DifficultyLevel, CombatDifficultyConfig> = {
+  beginner: {
+    dodgeChanceMin: AI_DODGE_CHANCE_MIN,
+    dodgeChanceMax: 0.82,
+    allowIdlePressure: false,
+    idlePressureChance: 0,
+    idlePressureIntervalMs: 0
+  },
+  intermediate: {
+    dodgeChanceMin: AI_DODGE_CHANCE_MIN,
+    dodgeChanceMax: AI_DODGE_CHANCE_MAX,
+    allowIdlePressure: false,
+    idlePressureChance: 0,
+    idlePressureIntervalMs: 0
+  },
+  expert: {
+    dodgeChanceMin: Math.max(AI_DODGE_CHANCE_MIN, 0.55),
+    dodgeChanceMax: AI_DODGE_CHANCE_MAX,
+    allowIdlePressure: true,
+    idlePressureChance: 0.68,
+    idlePressureIntervalMs: 1800
+  }
+};
 
 /** Returns whether one XY point lands inside a projected circle hitbox. */
 function pointInsideCircleXY(point: Vec3, circle: CircleHitbox): boolean {
@@ -255,6 +288,8 @@ export class CombatSystem {
   private threatProbability = 0;
   private attackActive = false;
   private attackResolved = false;
+  private difficulty: DifficultyLevel = "intermediate";
+  private proactiveAttackReadyAt = 0;
 
   /** Rearms dodge/counter state once one punch window has fully expired. */
   private rearmThreatWindow(): void {
@@ -360,9 +395,13 @@ export class CombatSystem {
       this.attackResolved = false;
     }
 
+    const difficultyConfig = COMBAT_DIFFICULTY_CONFIG[this.difficulty];
+
     if (attackStarted && !this.attackResolved && avatarThreat && hasThreatInput) {
       const staminaRatio = clamp(this.aiStamina / AI_STAMINA_MAX, 0, 1);
-      const dodgeChance = AI_DODGE_CHANCE_MIN + (AI_DODGE_CHANCE_MAX - AI_DODGE_CHANCE_MIN) * staminaRatio;
+      const dodgeChance =
+        difficultyConfig.dodgeChanceMin +
+        (difficultyConfig.dodgeChanceMax - difficultyConfig.dodgeChanceMin) * staminaRatio;
       const dodgeRoll = this.random();
       const canDodge = dodgeRoll <= dodgeChance;
       debug.dodgeChance = dodgeChance;
@@ -399,6 +438,18 @@ export class CombatSystem {
         this.applyAiHit(AI_HIT_DAMAGE);
         this.attackResolved = true;
         this.statusText = this.aiHp > 0 ? "Your punch caught the AI mid-motion" : "Victory. AI is down";
+      }
+    } else if (
+      difficultyConfig.allowIdlePressure &&
+      this.counterState === "idle" &&
+      hasThreatInput &&
+      output?.state_name === "idle" &&
+      !threatening &&
+      now >= this.proactiveAttackReadyAt
+    ) {
+      this.proactiveAttackReadyAt = now + difficultyConfig.idlePressureIntervalMs;
+      if (this.random() <= difficultyConfig.idlePressureChance) {
+        this.launchIdlePressureCounter(now, userPose);
       }
     } else if (this.counterState === "primed") {
       this.statusText = this.counterLaunchAt !== null ? "AI counter is locked on your last head position" : "AI counter is in motion";
@@ -544,6 +595,25 @@ export class CombatSystem {
     this.counterState = "idle";
   }
 
+  /** Sets combat difficulty profile for the next and current rounds. */
+  setDifficulty(level: DifficultyLevel): void {
+    this.difficulty = level;
+    this.proactiveAttackReadyAt = 0;
+  }
+
+  /** Launches an AI-initiated counter while the user stays idle on expert difficulty. */
+  private launchIdlePressureCounter(now: number, userPose: ResolvedPoseFrame | null): void {
+    this.counterMove = IDLE_PRESSURE_MOVE_PATTERN[this.counterIndex % IDLE_PRESSURE_MOVE_PATTERN.length];
+    this.counterIndex += 1;
+    this.counterLaunchAt = now + COUNTER_LAUNCH_DELAY_MS;
+    this.counterResolveAt = now + COUNTER_LAUNCH_DELAY_MS + COUNTER_RESOLVE_DELAY_MS;
+    this.counterTarget = resolveCounterTarget(userPose);
+    this.counterState = "primed";
+    this.lastGuardResult = "none";
+    this.lastCounterDefense = "none";
+    this.statusText = "AI is pressuring while you stay idle";
+  }
+
   /** Resets combat state so a new round can begin without a full page reload. */
   reset(modelMode: ModelMode, tracking: boolean): CombatSnapshot {
     this.aiHp = AI_HP_MAX;
@@ -574,6 +644,7 @@ export class CombatSystem {
     this.threatProbability = 0;
     this.attackActive = false;
     this.attackResolved = false;
+    this.proactiveAttackReadyAt = 0;
 
     return this.createSnapshot(modelMode, tracking);
   }

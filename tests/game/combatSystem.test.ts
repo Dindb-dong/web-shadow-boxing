@@ -609,6 +609,64 @@ describe("combatSystem", () => {
     expect(result.snapshot.successfulHits).toBe(0);
   });
 
+  it("uses a lower dodge max chance on beginner than intermediate", () => {
+    const beginner = new CombatSystem(() => 0.9);
+    beginner.setDifficulty("beginner");
+    const beginnerResult = beginner.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.9),
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    const intermediate = new CombatSystem(() => 0.9);
+    intermediate.setDifficulty("intermediate");
+    const intermediateResult = intermediate.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: createOutput("attacking", 0.9),
+      worldTraj: createFaceThreatTrajectory(),
+      userPose: createGuardPose(false)
+    });
+
+    expect(beginnerResult.triggerDodge).toBeNull();
+    expect(beginnerResult.snapshot.aiHp).toBe(92);
+    expect(intermediateResult.triggerDodge).not.toBeNull();
+    expect(intermediateResult.snapshot.aiHp).toBe(100);
+  });
+
+  it("can launch proactive attacks on expert when the user stays idle", () => {
+    const system = new CombatSystem(() => 0);
+    system.setDifficulty("expert");
+    const idleOutput = createOutput("idle", 0.1);
+    const idleThreatTrajectory = createFaceThreatTrajectory();
+
+    const primed = system.update({
+      now: 100,
+      modelMode: "mock",
+      tracking: true,
+      output: idleOutput,
+      worldTraj: idleThreatTrajectory,
+      userPose: createGuardPose(false)
+    });
+    const launched = system.update({
+      now: 260,
+      modelMode: "mock",
+      tracking: true,
+      output: idleOutput,
+      worldTraj: idleThreatTrajectory,
+      userPose: createGuardPose(false)
+    });
+
+    expect(primed.snapshot.counterState).toBe("primed");
+    expect(primed.snapshot.statusText).toContain("pressuring");
+    expect(launched.triggerCounter).not.toBeNull();
+    expect(launched.triggerCounter?.move).toBe("left_straight");
+  });
+
   it("lands a clean hit on the AI face when the dodge roll fails", () => {
     const system = new CombatSystem(() => 0.99);
     const output = createOutput("attacking", 0.9);
