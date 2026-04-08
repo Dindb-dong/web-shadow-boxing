@@ -48,6 +48,8 @@ describe("createAppShell", () => {
     expect(root?.textContent).toContain("Combat Overlap");
     expect(root?.textContent).toContain("Dodge Chance/Roll");
     expect(root?.textContent).toContain("AttackStarted Edge");
+    expect(root?.textContent).not.toContain("Assessment Age");
+    expect(root?.textContent).not.toContain("Refresh Count");
     expect(shell.statusValue.textContent).toContain("Camera");
     expect(shell.debugLogValue.textContent).toContain("Booting debug HUD");
   });

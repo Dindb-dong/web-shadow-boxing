@@ -40,8 +40,6 @@ export function createAppShell(container: HTMLElement): {
   debugCombatHitboxOverlapValue: HTMLSpanElement;
   debugDodgeChanceRollValue: HTMLSpanElement;
   debugAttackStartedEdgeValue: HTMLSpanElement;
-  debugAssessmentAgeValue: HTMLSpanElement;
-  debugRefreshCountValue: HTMLSpanElement;
   debugEmitCountValue: HTMLSpanElement;
   debugLastEventValue: HTMLParagraphElement;
   debugLogValue: HTMLPreElement;
@@ -101,8 +99,6 @@ export function createAppShell(container: HTMLElement): {
           <div class="metric-row"><span>Combat Overlap</span><strong data-role="debug-combat-hitbox-overlap">n/a</strong></div>
           <div class="metric-row"><span>Dodge Chance/Roll</span><strong data-role="debug-dodge-chance-roll">n/a</strong></div>
           <div class="metric-row"><span>AttackStarted Edge</span><strong data-role="debug-attack-started-edge">no</strong></div>
-          <div class="metric-row"><span>Assessment Age</span><strong data-role="debug-assessment-age">n/a</strong></div>
-          <div class="metric-row"><span>Refresh Count</span><strong data-role="debug-refresh-count">0</strong></div>
           <div class="metric-row"><span>Trajectory Emits</span><strong data-role="debug-emit-count">0</strong></div>
           <p class="debug-last-event" data-role="debug-last-event">Booting debug HUD</p>
           <pre class="debug-log" data-role="debug-log">Booting debug HUD</pre>
@@ -180,8 +176,6 @@ export function createAppShell(container: HTMLElement): {
   const debugCombatHitboxOverlapValue = container.querySelector<HTMLSpanElement>("[data-role='debug-combat-hitbox-overlap']");
   const debugDodgeChanceRollValue = container.querySelector<HTMLSpanElement>("[data-role='debug-dodge-chance-roll']");
   const debugAttackStartedEdgeValue = container.querySelector<HTMLSpanElement>("[data-role='debug-attack-started-edge']");
-  const debugAssessmentAgeValue = container.querySelector<HTMLSpanElement>("[data-role='debug-assessment-age']");
-  const debugRefreshCountValue = container.querySelector<HTMLSpanElement>("[data-role='debug-refresh-count']");
   const debugEmitCountValue = container.querySelector<HTMLSpanElement>("[data-role='debug-emit-count']");
   const debugLastEventValue = container.querySelector<HTMLParagraphElement>("[data-role='debug-last-event']");
   const debugLogValue = container.querySelector<HTMLPreElement>("[data-role='debug-log']");
@@ -225,8 +219,6 @@ export function createAppShell(container: HTMLElement): {
     !debugCombatHitboxOverlapValue ||
     !debugDodgeChanceRollValue ||
     !debugAttackStartedEdgeValue ||
-    !debugAssessmentAgeValue ||
-    !debugRefreshCountValue ||
     !debugEmitCountValue ||
     !debugLastEventValue ||
     !debugLogValue
@@ -273,8 +265,6 @@ export function createAppShell(container: HTMLElement): {
     debugCombatHitboxOverlapValue,
     debugDodgeChanceRollValue,
     debugAttackStartedEdgeValue,
-    debugAssessmentAgeValue,
-    debugRefreshCountValue,
     debugEmitCountValue,
     debugLastEventValue,
     debugLogValue

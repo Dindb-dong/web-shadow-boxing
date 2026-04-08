@@ -35,8 +35,6 @@ export class HudController {
       debugCombatHitboxOverlapValue: HTMLSpanElement;
       debugDodgeChanceRollValue: HTMLSpanElement;
       debugAttackStartedEdgeValue: HTMLSpanElement;
-      debugAssessmentAgeValue: HTMLSpanElement;
-      debugRefreshCountValue: HTMLSpanElement;
       debugEmitCountValue: HTMLSpanElement;
       debugLastEventValue: HTMLParagraphElement;
       debugLogValue: HTMLPreElement;
@@ -77,8 +75,6 @@ export class HudController {
     this.refs.debugCombatHitboxOverlapValue.textContent = snapshot.debug.combatHitboxOverlapLabel;
     this.refs.debugDodgeChanceRollValue.textContent = snapshot.debug.dodgeChanceRollLabel;
     this.refs.debugAttackStartedEdgeValue.textContent = snapshot.debug.attackStartedEdgeLabel;
-    this.refs.debugAssessmentAgeValue.textContent = snapshot.debug.assessmentAgeLabel;
-    this.refs.debugRefreshCountValue.textContent = snapshot.debug.refreshCountLabel;
     this.refs.debugEmitCountValue.textContent = snapshot.debug.emitCountLabel;
     this.refs.debugLastEventValue.textContent = snapshot.debug.lastEventLabel;
     this.refs.debugLogValue.textContent = snapshot.debug.logLines.join("\n");

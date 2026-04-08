@@ -132,8 +132,6 @@ export interface DebugHudSnapshot {
   combatHitboxOverlapLabel: string;
   dodgeChanceRollLabel: string;
   attackStartedEdgeLabel: string;
-  assessmentAgeLabel: string;
-  refreshCountLabel: string;
   emitCountLabel: string;
   lastEventLabel: string;
   logLines: string[];

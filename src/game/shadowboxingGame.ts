@@ -29,7 +29,6 @@ export class ShadowboxingGame {
   private poseLoopTimer: number | null = null;
   private renderFrameId: number | null = null;
   private inferenceBusy = false;
-  private lastThreatAssessmentAt: number | null = null;
   private stableOutput: ModelOutput | null = null;
   private stableWorldTrajectory: WristPairTrajectory | null = null;
   private lastRawOutput: ModelOutput | null = null;
@@ -88,8 +87,6 @@ export class ShadowboxingGame {
       combatHitboxOverlapLabel: "n/a",
       dodgeChanceRollLabel: "n/a",
       attackStartedEdgeLabel: "no",
-      assessmentAgeLabel: "n/a",
-      refreshCountLabel: "0",
       emitCountLabel: "0",
       lastEventLabel: "Booting debug HUD",
       logLines: ["Booting debug HUD"]
@@ -109,14 +106,13 @@ export class ShadowboxingGame {
 
   /** Starts webcam permissions, pose detection, and both runtime loops. */
   async start(): Promise<void> {
-    const now = performance.now();
     this.scene.resetCombatScene();
     this.poseBuffer.reset();
     this.resetThreatAssessment();
     this.lastTrajectoryEmitRawProb = null;
     this.hideEndgameOverlay();
     const resetSnapshot = this.combat.reset(this.predictor.mode, false);
-    this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot, now);
+    this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot);
     this.hud.update(this.latestHudSnapshot);
 
     try {
@@ -164,7 +160,7 @@ export class ShadowboxingGame {
     this.lastTrajectoryEmitRawProb = null;
     this.hideEndgameOverlay();
     const resetSnapshot = this.combat.reset(this.predictor.mode, false);
-    this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot, now);
+    this.latestHudSnapshot = this.toHudSnapshot(resetSnapshot);
     this.hud.update(this.latestHudSnapshot);
     this.recordDebugEvent(now, "New game started");
   };
@@ -231,7 +227,6 @@ export class ShadowboxingGame {
 
   /** Clears the stable threat assessment when tracking becomes unusable. */
   private resetThreatAssessment(): void {
-    this.lastThreatAssessmentAt = null;
     this.lastRawOutput = null;
     this.stableOutput = null;
     this.stableWorldTrajectory = null;
@@ -288,7 +283,7 @@ export class ShadowboxingGame {
   }
 
   /** Builds the debug HUD payload from the latest raw and stabilized state. */
-  private buildDebugSnapshot(now: number): HudSnapshot["debug"] {
+  private buildDebugSnapshot(): HudSnapshot["debug"] {
     return {
       rawThreatLabel: this.formatThreatLabel(this.lastRawOutput),
       rawAttackingProbLabel: this.lastRawOutput?.attacking_prob.toFixed(2) ?? "0.00",
@@ -302,9 +297,6 @@ export class ShadowboxingGame {
       combatHitboxOverlapLabel: this.combatHitboxOverlapLabel,
       dodgeChanceRollLabel: this.dodgeChanceRollLabel,
       attackStartedEdgeLabel: this.attackStartedEdgeLabel,
-      assessmentAgeLabel:
-        this.lastThreatAssessmentAt === null ? "n/a" : `${Math.max(now - this.lastThreatAssessmentAt, 0).toFixed(0)} ms`,
-      refreshCountLabel: `${this.threatAssessmentRefreshCount}`,
       emitCountLabel: `${this.threatTrajectoryEmitCount}`,
       lastEventLabel: this.lastDebugEvent,
       logLines: [...this.debugLogLines]
@@ -380,7 +372,6 @@ export class ShadowboxingGame {
       const previousOutput = this.stableOutput;
       const prediction = await this.predictor.predict(bufferSnapshot.features);
       this.setPredictionGatedReason(prediction ? "no" : "predictor-null");
-      this.lastThreatAssessmentAt = now;
       this.lastRawOutput = prediction;
       this.stableOutput = prediction;
       this.stableWorldTrajectory =
@@ -499,19 +490,18 @@ export class ShadowboxingGame {
       this.hideEndgameOverlay();
     }
 
-    this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot, now);
+    this.latestHudSnapshot = this.toHudSnapshot(combatUpdate.snapshot);
   }
 
   private toHudSnapshot(
-    snapshot: Omit<HudSnapshot, "trackingLabel" | "stateLabel" | "attackingProbLabel" | "debug">,
-    now: number
+    snapshot: Omit<HudSnapshot, "trackingLabel" | "stateLabel" | "attackingProbLabel" | "debug">
   ): HudSnapshot {
     return {
       ...snapshot,
       trackingLabel: snapshot.tracking ? "Locked" : "Searching",
       stateLabel: snapshot.activeThreat.stateName,
       attackingProbLabel: snapshot.activeThreat.attackingProb.toFixed(2),
-      debug: this.buildDebugSnapshot(now)
+      debug: this.buildDebugSnapshot()
     };
   }
 }
